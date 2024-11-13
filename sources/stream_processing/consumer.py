@@ -2,7 +2,6 @@ from confluent_kafka.avro import AvroConsumer
 from google.cloud import bigquery
 import os 
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/Users/Credentials/google_credentials.json"
 
 dataset_name = 'stream'
 table_name = 'bank_marketing'

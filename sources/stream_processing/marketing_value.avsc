@@ -1,0 +1,23 @@
+{
+  "namespace": "com.practice.bank",
+  "type": "record",
+  "name": "MarketingCampaignValue",
+  "fields": [
+    { "name": "Campaign_ID", "type": "int" },
+    { "name": "Company", "type": "string" },
+    { "name": "Campaign_Type", "type": "string" },
+    { "name": "Target_Audience", "type": "string" },
+    { "name": "Duration", "type": "string" },
+    { "name": "Channel_Used", "type": "string" },
+    { "name": "Conversion_Rate", "type": "float" },
+    { "name": "Acquisition_Cost", "type": "string" },
+    { "name": "ROI", "type": "float" },
+    { "name": "Location", "type": "string" },
+    { "name": "Language", "type": "string" },
+    { "name": "Clicks", "type": "int" },
+    { "name": "Impressions", "type": "int" },
+    { "name": "Engagement_Score", "type": "int" },
+    { "name": "Customer_Segment", "type": "string" },
+    { "name": "Date", "type": "string" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "namespace": "com.practice.bank",
+  "type": "record",
+  "name": "MarketingCampaignKey",
+  "fields": [
+    {
+      "name": "Campaign_ID",
+      "type": "int"
+    }
+  ]
+}

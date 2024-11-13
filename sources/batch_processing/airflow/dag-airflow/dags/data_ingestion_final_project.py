@@ -1,11 +1,13 @@
 import os
 import logging
+from airflow.utils.trigger_rule import TriggerRule
 
 from airflow import DAG
 from airflow.utils.dates import days_ago
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
-# from airflow.providers.amazon.aws.operators.redshift_sql import RedshiftSQLOperator
+from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
+
 
 import boto3
 import pyarrow.csv as pv
@@ -20,8 +22,7 @@ dataset_file = "marketing_campaign_dataset.csv"
 dataset_url = "https://drive.google.com/uc?export=download&id=17CV9DsFtuPHlZOy6O8DvebkfdNYQHlA_"
 path_to_local_home = "/opt/airflow"
 parquet_file = dataset_file.replace('.csv', '.parquet')
-# REDSHIFT_SCHEMA = os.environ.get("REDSHIFT_SCHEMA", 'public')
-# REDSHIFT_TABLE = os.environ.get("REDSHIFT_TABLE", 'bank_marketing')
+
 
 def format_to_parquet(src_file):
     if not src_file.endswith('.csv'):
@@ -76,36 +77,14 @@ with DAG(
             "local_file": f"{path_to_local_home}/{parquet_file}",
         },
     )
+    load_data_to_snowflake = SnowflakeOperator(
+        snowflake_conn_id = 'snowflake_connection',
+        sql = """
+            ALTER EXTERNAL TABLE MARKETING_CAMPAIGN REFRESH
+        """,
+        task_id = 'SnowFlake_Refresh',
+        trigger_rule = TriggerRule.NONE_FAILED
+    )
 
-    # create_redshift_external_table_task = RedshiftSQLOperator(
-    #     task_id="create_redshift_external_table_task",
-    #     sql=f"""
-    #         CREATE EXTERNAL TABLE {REDSHIFT_SCHEMA}.{REDSHIFT_TABLE} (
-    #             campaign_id INT,
-    #             company STRING,
-    #             campaign_type STRING,
-    #             target_audience STRING,
-    #             duration STRING,
-    #             channel_used STRING,
-    #             conversion_rate FLOAT,
-    #             acquisition_cost STRING,
-    #             roi FLOAT,
-    #             location STRING,
-    #             language STRING,
-    #             clicks INT,
-    #             impressions INT,
-    #             engagement_score INT,
-    #             customer_segment STRING,
-    #             date DATE
-    #         )
-    #         ROW FORMAT SERDE 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
-    #         STORED AS PARQUET
-    #         LOCATION 's3://{S3_BUCKET}/raw/'
-    #         TABLE PROPERTIES ('parquet.compression'='SNAPPY');
-    #     """,
-    #     redshift_conn_id="your_redshift_connection"
-    # )
-
-    download_dataset_task >> format_to_parquet_task >> local_to_s3_task 
+    download_dataset_task >> format_to_parquet_task >> local_to_s3_task >> load_data_to_snowflake
     
-    # >> create_redshift_external_table_task

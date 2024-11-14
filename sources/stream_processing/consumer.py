@@ -1,72 +1,129 @@
 from confluent_kafka.avro import AvroConsumer
-from google.cloud import bigquery
-import os 
+import snowflake.connector
+import os
+from dotenv import load_dotenv
 
+# Tải các biến từ tệp .env
+load_dotenv()
 
-dataset_name = 'stream'
-table_name = 'bank_marketing'
+# Lấy thông tin kết nối từ biến môi trường
+SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
+SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
+SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
+SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
+SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
+SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
+SNOWFLAKE_TABLE = "campaign_data"
 
-client = bigquery.Client()
-client.create_dataset(dataset_name, exists_ok=True)
-dataset = client.dataset(dataset_name)
+# Kết nối với Snowflake
+conn = snowflake.connector.connect(
+    user=SNOWFLAKE_USER,
+    password=SNOWFLAKE_PASSWORD,
+    account=SNOWFLAKE_ACCOUNT,
+    warehouse=SNOWFLAKE_WAREHOUSE,
+    database=SNOWFLAKE_DATABASE,
+    schema=SNOWFLAKE_SCHEMA
+)
+cursor = conn.cursor()
 
-schema = [
-    bigquery.SchemaField('client_id', 'NUMERIC'),
-    bigquery.SchemaField('age', 'NUMERIC'),
-    bigquery.SchemaField('job', 'STRING'),
-    bigquery.SchemaField('marital', 'STRING'),
-    bigquery.SchemaField('education', 'STRING'),
-    bigquery.SchemaField('credit', 'STRING'),
-    bigquery.SchemaField('housing', 'STRING'),
-    bigquery.SchemaField('loan', 'STRING'),
-    bigquery.SchemaField('contact', 'STRING'),
-    bigquery.SchemaField('day_of_week', 'STRING'),
-    bigquery.SchemaField('duration', 'NUMERIC'),
-    bigquery.SchemaField('campaign', 'NUMERIC'),
-    bigquery.SchemaField('pdays', 'NUMERIC'),
-    bigquery.SchemaField('previous', 'NUMERIC'),
-    bigquery.SchemaField('poutcome', 'STRING'),
-    bigquery.SchemaField('emp_var_rate', 'FLOAT64'),
-    bigquery.SchemaField('cons_price_idx', 'FLOAT64'),
-    bigquery.SchemaField('cons_conf_idx', 'FLOAT64'),
-    bigquery.SchemaField('euribor3m', 'FLOAT64'),
-    bigquery.SchemaField('nr_employed', 'FLOAT64'),
-    bigquery.SchemaField('y', 'STRING'),
-    bigquery.SchemaField('date', 'STRING')
-]
+# Tạo bảng nếu chưa tồn tại
+create_table_query = f"""
+CREATE TABLE IF NOT EXISTS {SNOWFLAKE_TABLE} (
+    Campaign_ID INT,
+    Company STRING,
+    Campaign_Type STRING,
+    Target_Audience STRING,
+    Duration STRING,
+    Channel_Used STRING,
+    Conversion_Rate FLOAT,
+    Acquisition_Cost STRING,
+    ROI FLOAT,
+    Location STRING,
+    Language STRING,
+    Clicks INT,
+    Impressions INT,
+    Engagement_Score INT,
+    Customer_Segment STRING,
+    Date STRING
+);
+"""
+cursor.execute(create_table_query)
 
-table_ref = bigquery.TableReference(dataset, table_name)
-table = bigquery.Table(table_ref, schema=schema)
-client.create_table(table, exists_ok=True)
-
-def read_messages():
-    consumer_config = {"bootstrap.servers": "localhost:9092",
-                       "schema.registry.url": "http://localhost:8081",
-                       "group.id": "practice.bitcoin.avro.consumer.2",
-                       "auto.offset.reset": "earliest"}
+def read_messages(batch_size=10000):
+    consumer_config = {
+        "bootstrap.servers": "localhost:9092",
+        "schema.registry.url": "http://localhost:8081",
+        "group.id": "practice.bitcoin.avro.consumer.2",
+        "auto.offset.reset": "earliest"
+    }
 
     consumer = AvroConsumer(consumer_config)
-    consumer.subscribe(["bank_marketing"])
+    consumer.subscribe(["marketing_campaign"])
 
-    while(True):
+    batch = []  # Khởi tạo lô dữ liệu
+    while True:
         try:
-            message = consumer.poll(5)
+            message = consumer.poll(1)  # Giảm thời gian chờ để lấy tin nhắn nhanh hơn
         except Exception as e:
             print(f"Exception while trying to poll messages - {e}")
+            continue
+        if message is not None:
+            print(f"Successfully polled a record from Kafka topic: {message.topic()}, partition: {message.partition()}, offset: {message.offset()}\n"
+                  f"message key: {message.key()} || message value: {message.value()}")
+            consumer.commit()
+
+            # Thu thập bản ghi vào lô
+            message_value = message.value()
+            values = (
+                message_value.get('Campaign_ID'),
+                message_value.get('Company'),
+                message_value.get('Campaign_Type'),
+                message_value.get('Target_Audience'),
+                message_value.get('Duration'),
+                message_value.get('Channel_Used'),
+                message_value.get('Conversion_Rate'),
+                message_value.get('Acquisition_Cost'),
+                message_value.get('ROI'),
+                message_value.get('Location'),
+                message_value.get('Language'),
+                message_value.get('Clicks'),
+                message_value.get('Impressions'),
+                message_value.get('Engagement_Score'),
+                message_value.get('Customer_Segment'),
+                message_value.get('Date')
+            )
+            batch.append(values)
+
+            # Khi đạt batch_size, chèn cả lô vào Snowflake
+            if len(batch) >= batch_size:
+                insert_query = f"""
+                INSERT INTO {SNOWFLAKE_TABLE} (
+                    Campaign_ID, Company, Campaign_Type, Target_Audience, Duration, 
+                    Channel_Used, Conversion_Rate, Acquisition_Cost, ROI, Location, 
+                    Language, Clicks, Impressions, Engagement_Score, Customer_Segment, Date
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """
+                cursor.executemany(insert_query, batch)  # Chèn theo lô
+                conn.commit()
+                batch.clear()  # Xóa lô sau khi chèn xong
         else:
-            if message is not None:
-                print(f"Successfully poll a record from "
-                      f"Kafka topic: {message.topic()}, partition: {message.partition()}, offset: {message.offset()}\n"
-                      f"message key: {message.key()} || message value: {message.value()}")
-                consumer.commit()
-                # INSERT STREAM TO BIGQUERY
-                client.insert_rows(table, [message.value()])
-            else:
-                print("No new messages at this point. Try again later.")
+            # Khi không có tin nhắn mới, kiểm tra xem lô hiện tại có dữ liệu để chèn không
+            if batch:
+                insert_query = f"""
+                INSERT INTO {SNOWFLAKE_TABLE} (
+                    Campaign_ID, Company, Campaign_Type, Target_Audience, Duration, 
+                    Channel_Used, Conversion_Rate, Acquisition_Cost, ROI, Location, 
+                    Language, Clicks, Impressions, Engagement_Score, Customer_Segment, Date
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """
+                cursor.executemany(insert_query, batch)
+                conn.commit()
+                batch.clear()
+            print("No new messages at this point. Try again later.")
 
     consumer.close()
-
+    cursor.close()
+    conn.close()
 
 if __name__ == "__main__":
     read_messages()
-

@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: COMPUTE_WH
+    database: test
+    tables:
+      - name: fact_marketing
+      - name: dim_channel
+      - name: dim_company
+      - name: dim_customer_segment
+      - name: dim_language
+      - name: dim_target_audience
+      - name: dim_campaign 

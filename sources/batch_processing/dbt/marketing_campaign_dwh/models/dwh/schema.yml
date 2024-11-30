@@ -1,0 +1,163 @@
+version: 2
+
+models:
+  - name: fact_marketing
+    description: "Fact table containing marketing campaign data"
+    columns:
+      - name: campaign_id
+        description: "Unique identifier for the campaign"
+        tests:
+          - not_null
+          - unique
+      - name: campaign_type_id
+        description: "Identifier for campaign types"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_campaign')
+              field: campaign_type_id
+      - name: company_id
+        description: "Identifier for companies involved in the campaign"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_company')
+              field: company_id
+      - name: audience_id
+        description: "Identifier for target audience types"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_target_audience')
+              field: audience_id
+      - name: duration
+        description: "Duration of the campaign in seconds"
+      - name: channel_id
+        description: "Identifier for channels used in the campaign"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_channel')
+              field: channel_id
+      - name: conversion_rate
+        description: "Conversion rate of the campaign"
+      - name: acquisition_cost
+        description: "Cost of acquiring a customer during the campaign"
+      - name: roi
+        description: "Return on investment of the campaign"
+      - name: language_id
+        description: "Identifier for languages used in the campaign"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_language')
+              field: language_id
+      - name: clicks
+        description: "Number of clicks during the campaign"
+      - name: location
+        description: "Name of the location of the campaign"
+      - name: impressions
+        description: "Number of impressions during the campaign"
+      - name: engagement_score
+        description: "Engagement score during the campaign"
+      - name: customer_segment_id
+        description: "Identifier for customer segments targeted in the campaign"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customer_segment')
+              field: customer_segment_id
+      - name: date
+        description: "Date when the campaign occurred"
+        tests:
+          - not_null
+
+  - name: dim_campaign
+    description: "Dimension table containing campaign types"
+    columns:
+      - name: campaign_type_id
+        description: "Unique identifier for campaign types"
+        tests:
+          - not_null
+          - unique
+      - name: campaign_type_name
+        description: "Type of the campaign (e.g., Email, Influencer, Display)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Email', 'Influencer', 'Display', 'Social Media', 'Search']
+
+  - name: dim_company
+    description: "Dimension table containing company information"
+    columns:
+      - name: company_id
+        description: "Unique identifier for companies"
+        tests:
+          - not_null
+          - unique
+      - name: company_name
+        description: "Name of the company"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Innovate Industries', 'NexGen Systems', 'Alpha Innovations', 'DataTech Solutions', 'TechCorp']
+
+  - name: dim_target_audience
+    description: "Dimension table containing target audience information"
+    columns:
+      - name: audience_id
+        description: "Unique identifier for target audiences"
+        tests:
+          - not_null
+          - unique
+      - name: audience_name
+        description: "Name of the target audience (e.g., Men 18-24, Women 35-44)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Men 18-24', 'Women 35-44', 'Men 25-34', 'All Ages','Women 25-34']
+
+  - name: dim_channel
+    description: "Dimension table containing channel information"
+    columns:
+      - name: channel_id
+        description: "Unique identifier for channels"
+        tests:
+          - not_null
+          - unique
+      - name: channel_name
+        description: "Name of the channel (e.g., Google Ads, YouTube)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Google Ads', 'YouTube', 'Facebook', 'Instagram', 'Website', 'Email']
+
+  - name: dim_language
+    description: "Dimension table containing language information"
+    columns:
+      - name: language_id
+        description: "Unique identifier for languages"
+        tests:
+          - not_null
+          - unique
+      - name: language_name
+        description: "Name of the language (e.g., English, Spanish)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['English', 'Spanish', 'German', 'French', 'Mandarin']
+
+  - name: dim_customer_segment
+    description: "Dimension table containing customer segment information"
+    columns:
+      - name: customer_segment_id
+        description: "Unique identifier for customer segments"
+        tests:
+          - not_null
+          - unique
+      - name: segment_name
+        description: "Name of the customer segment (e.g., Health & Wellness, Fashionistas)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Health & Wellness', 'Fashionistas', 'Outdoor Adventurers', 'Foodies', 'Tech Enthusiasts']

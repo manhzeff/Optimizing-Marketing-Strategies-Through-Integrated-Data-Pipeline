@@ -1,0 +1,117 @@
+version: 2
+
+models:
+  - name: Marketing_Campaign_Overview
+    description: >
+      This model aggregates marketing campaign performance by campaign type, company, and audience.
+    columns:
+      - name: company_name
+        description: "The name of the company running the campaign."
+      - name: audience_type
+        description: "The target audience for the marketing campaign."
+      - name: successful_campaigns
+        description: "The count of campaigns that have at least 1 click."
+      - name: unsuccessful_campaigns
+        description: "The count of campaigns that have 0 clicks."
+  
+  - name: Audience_Channel_Performance
+    description: >
+      This model aggregates marketing performance by channel type and audience.
+    columns:
+      - name: channel_type
+        description: "The type of the marketing channel (e.g., social media, search, email, etc.)."
+      - name: audience_type
+        description: "The target audience for the marketing campaign."
+      - name: campaigns_with_impressions
+        description: "The number of campaigns that have at least 1 impression."
+      - name: campaigns_without_impressions
+        description: "The number of campaigns that have 0 impressions."
+  
+  - name: Customer_Segmentation_Insights
+    description: >
+      This model aggregates marketing performance based on customer segment and language type.
+    columns:
+      - name: customer_segment_type
+        description: "The type of customer segment targeted by the campaign."
+      - name: language_type
+        description: "The language used in the marketing campaign."
+      - name: high_conversion_campaigns
+        description: "The count of campaigns with a conversion rate higher than 5%."
+      - name: low_conversion_campaigns
+        description: "The count of campaigns with a conversion rate less than or equal to 5%."
+  
+  - name: Campaign_Effectiveness_ROI
+    description: >
+      This model calculates the number of campaigns with positive and negative ROI.
+    columns:
+      - name: company_name
+        description: "The name of the company running the campaign."
+      - name: location
+        description: "Name of the location of the campaign"
+      - name: positive_roi_campaigns
+        description: "The number of campaigns with a positive ROI."
+      - name: negative_roi_campaigns
+        description: "The number of campaigns with a negative ROI."
+  
+  - name: Time_Based_Campaign_Insights
+    description: >
+      This model aggregates campaign performance based on engagement score over time.
+    columns:
+      - name: campaign_id
+        description: "The ID of the marketing campaign."
+      - name: Date
+        description: "The date of the campaign."
+      - name: high_engagement_campaigns
+        description: "The count of campaigns with an engagement score greater than 50."
+      - name: low_engagement_campaigns
+        description: "The count of campaigns with an engagement score of 50 or lower."
+  
+  - name: Time_Partitioned_Campaign_Performance
+    description: >
+      This model aggregates campaign performance based on time partitioning, allowing for efficient time-based queries.
+    columns:
+      - name: campaign_id
+        description: "The ID of the marketing campaign."
+      - name: Date
+        description: "The date of the campaign."
+      - name: campaign_type_id
+        description: "The ID of the campaign type."
+      - name: campaign_type_name
+        description: "The name of the campaign type."
+      - name: company_id
+        description: "The ID of the company running the campaign."
+      - name: company_name
+        description: "The name of the company running the campaign."
+      - name: audience_id
+        description: "The ID of the target audience."
+      - name: audience_type
+        description: "The type of the target audience."
+      - name: duration
+        description: "The duration of the campaign in days."
+      - name: channel_id
+        description: "The ID of the marketing channel."
+      - name: channel_type
+        description: "The type of the marketing channel (e.g., social media, email, etc.)."
+      - name: conversion_rate
+        description: "The conversion rate of the campaign."
+      - name: acquisition_cost
+        description: "The cost to acquire a customer for the campaign."
+      - name: roi
+        description: "The return on investment for the campaign."
+      - name: language_id
+        description: "The ID of the language used in the campaign."
+      - name: language_type
+        description: "The language used in the campaign."
+      - name: clicks
+        description: "The number of clicks for the campaign."
+      - name: location
+        description: "Name of the location of the campaign"
+      - name: impressions
+        description: "The number of impressions for the campaign."
+      - name: engagement_score
+        description: "The engagement score of the campaign."
+      - name: customer_segment_id
+        description: "The ID of the customer segment targeted by the campaign."
+      - name: customer_segment_type
+        description: "The type of customer segment targeted by the campaign."
+

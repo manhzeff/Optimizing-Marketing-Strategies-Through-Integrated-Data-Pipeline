@@ -42,9 +42,9 @@ jobs:
                      "conf": {},
                      "dag_run_id": "ci_cd_trigger_1"
                    }'
-          echo "Đợi 60 giây để DAG chạy"
-          sleep 60
-          # (Tùy chọn) Kiểm tra trạng thái DAG Run bằng GET /dagRuns/<dag_run_id>
+          echo "Đợi 100 giây để DAG chạy"
+          sleep 100
+          GET /dagRuns/<dag_run_id>
 
       - name: Teardown Airflow
         run: |

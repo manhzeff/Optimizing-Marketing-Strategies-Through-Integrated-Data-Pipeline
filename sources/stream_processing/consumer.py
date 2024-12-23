@@ -1,129 +1,83 @@
-from confluent_kafka.avro import AvroConsumer
-import snowflake.connector
+import boto3
+import csv
 import os
+from confluent_kafka.avro import AvroConsumer
 from dotenv import load_dotenv
 
-# Tải các biến từ tệp .env
 load_dotenv()
 
-# Lấy thông tin kết nối từ biến môi trường
-SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
-SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
-SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
-SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
-SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
-SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
-SNOWFLAKE_TABLE = "campaign_data"
-
-# Kết nối với Snowflake
-conn = snowflake.connector.connect(
-    user=SNOWFLAKE_USER,
-    password=SNOWFLAKE_PASSWORD,
-    account=SNOWFLAKE_ACCOUNT,
-    warehouse=SNOWFLAKE_WAREHOUSE,
-    database=SNOWFLAKE_DATABASE,
-    schema=SNOWFLAKE_SCHEMA
+# Config AWS S3
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_KEY")
 )
-cursor = conn.cursor()
+S3_BUCKET = 'zeffmarketingbucket'
+S3_KEY = 'raw/campaign_data.csv'  # Đường dẫn lưu file CSV trong bucket
 
-# Tạo bảng nếu chưa tồn tại
-create_table_query = f"""
-CREATE TABLE IF NOT EXISTS {SNOWFLAKE_TABLE} (
-    Campaign_ID INT,
-    Company STRING,
-    Campaign_Type STRING,
-    Target_Audience STRING,
-    Duration STRING,
-    Channel_Used STRING,
-    Conversion_Rate FLOAT,
-    Acquisition_Cost STRING,
-    ROI FLOAT,
-    Location STRING,
-    Language STRING,
-    Clicks INT,
-    Impressions INT,
-    Engagement_Score INT,
-    Customer_Segment STRING,
-    Date STRING
-);
-"""
-cursor.execute(create_table_query)
+def write_to_s3_as_csv(data):
+    """
+    Ghi toàn bộ dữ liệu vào một file CSV và upload lên S3.
+    """
+    local_file_name = 'campaign_data_combined.csv'  # Tên file tạm
+    
+    # Ghi tất cả dữ liệu vào file CSV
+    try:
+        # Lấy danh sách các cột từ khóa của JSON đầu tiên
+        fieldnames = data[0].keys() if data else []
+        
+        # Ghi dữ liệu vào file CSV
+        with open(local_file_name, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()  # Ghi header
+            writer.writerows(data)  # Ghi từng dòng dữ liệu
+        
+        # Upload file lên S3
+        s3_client.upload_file(local_file_name, S3_BUCKET, S3_KEY)
+        print(f"Successfully uploaded {local_file_name} to s3://{S3_BUCKET}/{S3_KEY}")
+    except Exception as e:
+        print(f"Error uploading to S3: {e}")
+    finally:
+        os.remove(local_file_name)  # Xóa file tạm sau khi upload
 
-def read_messages(batch_size=10000):
+def read_messages_to_s3():
+    """
+    Đọc tất cả tin nhắn Kafka và lưu vào một file CSV duy nhất trên S3.
+    """
     consumer_config = {
         "bootstrap.servers": "localhost:9092",
         "schema.registry.url": "http://localhost:8081",
         "group.id": "practice.bitcoin.avro.consumer.2",
         "auto.offset.reset": "earliest"
     }
-
     consumer = AvroConsumer(consumer_config)
     consumer.subscribe(["marketing_campaign"])
 
-    batch = []  # Khởi tạo lô dữ liệu
+    all_data = []  # Danh sách để gom toàn bộ dữ liệu Kafka
+
+    print("Starting to read messages from Kafka...")
     while True:
         try:
-            message = consumer.poll(1)  # Giảm thời gian chờ để lấy tin nhắn nhanh hơn
+            message = consumer.poll(1)
         except Exception as e:
-            print(f"Exception while trying to poll messages - {e}")
+            print(f"Exception while polling messages - {e}")
             continue
+
         if message is not None:
-            print(f"Successfully polled a record from Kafka topic: {message.topic()}, partition: {message.partition()}, offset: {message.offset()}\n"
-                  f"message key: {message.key()} || message value: {message.value()}")
-            consumer.commit()
-
-            # Thu thập bản ghi vào lô
             message_value = message.value()
-            values = (
-                message_value.get('Campaign_ID'),
-                message_value.get('Company'),
-                message_value.get('Campaign_Type'),
-                message_value.get('Target_Audience'),
-                message_value.get('Duration'),
-                message_value.get('Channel_Used'),
-                message_value.get('Conversion_Rate'),
-                message_value.get('Acquisition_Cost'),
-                message_value.get('ROI'),
-                message_value.get('Location'),
-                message_value.get('Language'),
-                message_value.get('Clicks'),
-                message_value.get('Impressions'),
-                message_value.get('Engagement_Score'),
-                message_value.get('Customer_Segment'),
-                message_value.get('Date')
-            )
-            batch.append(values)
-
-            # Khi đạt batch_size, chèn cả lô vào Snowflake
-            if len(batch) >= batch_size:
-                insert_query = f"""
-                INSERT INTO {SNOWFLAKE_TABLE} (
-                    Campaign_ID, Company, Campaign_Type, Target_Audience, Duration, 
-                    Channel_Used, Conversion_Rate, Acquisition_Cost, ROI, Location, 
-                    Language, Clicks, Impressions, Engagement_Score, Customer_Segment, Date
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
-                """
-                cursor.executemany(insert_query, batch)  # Chèn theo lô
-                conn.commit()
-                batch.clear()  # Xóa lô sau khi chèn xong
+            all_data.append(message_value)  # Thêm dữ liệu vào danh sách
         else:
-            # Khi không có tin nhắn mới, kiểm tra xem lô hiện tại có dữ liệu để chèn không
-            if batch:
-                insert_query = f"""
-                INSERT INTO {SNOWFLAKE_TABLE} (
-                    Campaign_ID, Company, Campaign_Type, Target_Audience, Duration, 
-                    Channel_Used, Conversion_Rate, Acquisition_Cost, ROI, Location, 
-                    Language, Clicks, Impressions, Engagement_Score, Customer_Segment, Date
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
-                """
-                cursor.executemany(insert_query, batch)
-                conn.commit()
-                batch.clear()
-            print("No new messages at this point. Try again later.")
+            print("No new messages. Stopping consumer...")
+            break
 
     consumer.close()
-    cursor.close()
-    conn.close()
+
+    # Upload toàn bộ dữ liệu lên S3 dưới dạng CSV
+    if all_data:
+        print(f"Total messages fetched: {len(all_data)}")
+        write_to_s3_as_csv(all_data)
+    else:
+        print("No data fetched. Nothing to upload.")
 
 if __name__ == "__main__":
-    read_messages()
+    read_messages_to_s3()

@@ -19,7 +19,7 @@ AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 S3_BUCKET = os.environ.get("AWS_S3_BUCKET")
 S3_KEY = "bank_marketing_dataset"
 dataset_file = "marketing_campaign_dataset.csv"
-dataset_url = "https://drive.google.com/uc?export=download&id=17CV9DsFtuPHlZOy6O8DvebkfdNYQHlA_"
+dataset_url = "https://drive.google.com/uc?export=download&id=1osgD5kTc7p6wNbe9yL0biuYT9KUqQxJ3"
 path_to_local_home = "/opt/airflow"
 parquet_file = dataset_file.replace('.csv', '.parquet')
 
@@ -80,7 +80,7 @@ with DAG(
     load_data_to_snowflake = SnowflakeOperator(
         snowflake_conn_id = 'snowflake_connection',
         sql = """
-            ALTER EXTERNAL TABLE MARKETING_CAMPAIGN REFRESH
+            ALTER EXTERNAL TABLE EXTERNAL_CAMPAIGN_DATA REFRESH
         """,
         task_id = 'SnowFlake_Refresh',
         trigger_rule = TriggerRule.NONE_FAILED

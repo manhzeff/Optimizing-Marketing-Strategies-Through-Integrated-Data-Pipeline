@@ -38,12 +38,24 @@ jobs:
           curl -u "airflow:airflow" \
                -X POST "http://localhost:8080/api/v1/dags/data_ingestion_aws_project/dagRuns" \
                -H "Content-Type: application/json" \
-               -d '{ \
-                     "conf": {}, \
-                     "dag_run_id": "ci_cd_trigger_1" \
+               -d '{ 
+                     "conf": {}, 
+                     "dag_run_id": "ci_cd_trigger_1" 
                    }'
           echo "Đợi 100 giây để DAG chạy"
           sleep 100
+
+
+
+      - name: Monitor Airflow DAG
+        run: |
+          echo "Monitoring DAG execution status..."
+          until [ "$(curl -u airflow:airflow -s \
+            -X GET "http://localhost:8080/api/v1/dags/data_ingestion_aws_project/dagRuns/ci_cd_trigger" | jq -r '.state')" = "success" ]; do
+            echo "DAG is still running..."
+            sleep 10
+          done
+          echo "DAG execution completed successfully."
           
 
       - name: Teardown Airflow

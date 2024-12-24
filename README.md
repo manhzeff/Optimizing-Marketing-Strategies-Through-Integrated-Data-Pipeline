@@ -1,4 +1,4 @@
-# Bank Marketing Campaign for Term Deposit : End-to-End Data Pipelines
+# Marketing Campaign for Term Deposit : End-to-End Data Pipelines
 
 ## Business Understanding
 
@@ -17,21 +17,8 @@ In order solve the problems, as a Data Engineer we are proposing objectives as f
 
 ## End-to-End Schema with Lambda Architecture
 
-![image](https://user-images.githubusercontent.com/25638454/230260562-ddf206b6-9f01-4b0b-b8c7-208749f0f288.png)
 
 ## Data Visualization Dashboard
 
-Access the dashboard in Tableau Public [here](https://public.tableau.com/app/profile/muhammad.sholahuddin.al.ayubi/viz/final-project-dashboard/Dashboard1?publish=yes)
+Access the dashboard in Tableau Public 
 
-![image](https://user-images.githubusercontent.com/25638454/230291558-40613468-9d09-4205-9bae-aed712c6e5c2.png)
-
-## Links
-- [Deck Slides](https://docs.google.com/presentation/d/1eUcCzFZcUY7ccTL7gGFcOrrQB3iMTxqG/edit?usp=sharing&ouid=108195231321016830672&rtpof=true&sd=true)
-- [Analytics Dashboard](https://public.tableau.com/app/profile/muhammad.sholahuddin.al.ayubi/viz/final-project-dashboard/Dashboard1?publish=yes)
-- [Installation & Dependencies Guide](https://github.com/addin12/DF9-final-project/blob/main/sources/README.MD)
-
-## Contributors
-- [Mahendra Diwasasri Reka Pravyana](https://www.linkedin.com/in/mahendradiwasasri)
-- [Febrianti](https://www.linkedin.com/in/febs)
-- [Dimas Rifa’i Lombu](https://www.linkedin.com/in/dimaslombu)
-- [Muhammad Sholahuddin Al Ayubi](https://www.linkedin.com/in/saladinal/)

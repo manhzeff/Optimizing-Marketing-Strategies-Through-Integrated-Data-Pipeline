@@ -1,0 +1,102 @@
+version: 2
+
+models:
+  # 1. Hiệu suất theo kênh
+  - name: subs_by_Channel
+    description: >
+      Aggregates campaign performance by channel type and month, 
+      including total campaigns, conversion rates, and other metrics.
+    columns:
+      - name: month_date
+        description: "The first day of the month (truncated from 'Date') for grouping monthly performance."
+      - name: channel_type
+        description: "The type of the marketing channel (e.g., social media, search, email, etc.)."
+      - name: total_campaigns
+        description: "The total number of unique campaigns for each channel in that month."
+      - name: avg_conversion_rate
+        description: "The average conversion rate across campaigns in this channel for that month."
+      - name: avg_engagement_score
+        description: "The average engagement score for campaigns in this channel for that month."
+      - name: avg_roi
+        description: "The average return on investment for campaigns in this channel for that month."
+      - name: total_clicks
+        description: "The total number of clicks for campaigns in this channel for that month."
+      - name: total_impressions
+        description: "The total number of impressions for campaigns in this channel for that month."
+
+  # 2. Hiệu suất theo đối tượng mục tiêu
+  - name: subs_by_Target_Audience
+    description: >
+      Aggregates campaign performance by target audience type and month.
+    columns:
+      - name: month_date
+        description: "The first day of the month (truncated from 'Date') for grouping monthly performance."
+      - name: audience_type
+        description: "The type of target audience for the marketing campaign."
+      - name: total_campaigns
+        description: "The total number of unique campaigns for each target audience in that month."
+      - name: avg_conversion_rate
+        description: "The average conversion rate for the campaigns targeting this audience in that month."
+      - name: avg_engagement_score
+        description: "The average engagement score for campaigns targeting this audience in that month."
+      - name: total_clicks
+        description: "The total number of clicks for campaigns targeting this audience in that month."
+
+  # 3. Hiệu suất theo phân khúc khách hàng
+  - name: subs_by_Customer_Segment
+    description: >
+      Aggregates campaign performance by customer segment and month, including ROI and acquisition cost.
+    columns:
+      - name: month_date
+        description: "The first day of the month (truncated from 'Date') for grouping monthly performance."
+      - name: customer_segment_type
+        description: "The type of customer segment targeted by the campaign."
+      - name: total_campaigns
+        description: "The total number of unique campaigns for each customer segment in that month."
+      - name: avg_roi
+        description: "The average return on investment for campaigns in this segment in that month."
+      - name: avg_acquisition_cost
+        description: "The average acquisition cost for campaigns in this segment in that month."
+      - name: total_clicks
+        description: "The total number of clicks for campaigns in this segment in that month."
+
+  # 4. Hiệu suất theo địa điểm và ngôn ngữ
+  - name: subs_by_Location_Language
+    description: >
+      Aggregates campaign performance by location and language on a monthly basis.
+    columns:
+      - name: month_date
+        description: "The first day of the month (truncated from 'Date') for grouping monthly performance."
+      - name: location
+        description: "The geographical location where the campaign was run."
+      - name: language_type
+        description: "The language used in the campaign."
+      - name: total_campaigns
+        description: "The total number of unique campaigns for each location-language pair in that month."
+      - name: avg_roi
+        description: "The average return on investment for the campaigns in this location-language pair."
+      - name: avg_conversion_rate
+        description: "The average conversion rate for campaigns in this location-language pair."
+      - name: total_impressions
+        description: "The total number of impressions for campaigns in this location-language pair."
+      - name: total_clicks
+        description: "The total number of clicks for campaigns in this location-language pair."
+
+  # 5. Hiệu suất theo thời gian và thời lượng
+  - name: subs_by_Date_Duration
+    description: >
+      Aggregates campaign performance by month and campaign duration, 
+      including engagement and conversion metrics.
+    columns:
+      - name: month_date
+        description: "The first day of the month (truncated from 'Date') for grouping monthly performance."
+      - name: duration
+        description: "The duration of the campaign in days (e.g., 15, 30, 45...)."
+      - name: total_campaigns
+        description: "The total number of unique campaigns in that month-duration group."
+      - name: avg_engagement_score
+        description: "The average engagement score for campaigns in this month-duration group."
+      - name: avg_conversion_rate
+        description: "The average conversion rate for campaigns in this month-duration group."
+      - name: total_clicks
+        description: "The total number of clicks for campaigns in this month-duration group."

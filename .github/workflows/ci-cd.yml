@@ -14,48 +14,63 @@ jobs:
     steps:
       # 1. Check out mã nguồn
       - name: Check out repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # 2. Thiết lập Docker Buildx (nếu cần build image)
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
-      # -----------------------------------------------------------
-      # 3. Khởi động Airflow (batch) & Trigger DAG qua REST API
-      # -----------------------------------------------------------
+      # 3. Create .env file
+      - name: Create .env file from Secrets
+        run: |
+          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+          echo "AWS_SECRET_KEY_ID=${{ secrets.AWS_SECRET_KEY_ID }}" >> .env
+          echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}" >> .env
+          echo "SNOWFLAKE_ACCOUNT=${{ secrets.SNOWFLAKE_ACCOUNT }}" >> .env
+          echo "SNOWFLAKE_USER=${{ secrets.SNOWFLAKE_USER }}" >> .env
+          echo "SNOWFLAKE_PASSWORD=${{ secrets.SNOWFLAKE_PASSWORD }}" >> .env
+          echo "SNOWFLAKE_DATABASE=${{ secrets.SNOWFLAKE_DATABASE }}" >> .env
+          echo "SNOWFLAKE_SCHEMA=${{ secrets.SNOWFLAKE_SCHEMA }}" >> .env
+          echo "SNOWFLAKE_TABLE=${{ secrets.SNOWFLAKE_TABLE }}" >> .env
+          echo "SNOWFLAKE_WAREHOUSE=${{ secrets.SNOWFLAKE_WAREHOUSE }}" >> .env
+
+      - name: Set up Python environment and install dependencies
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+
       - name: Start Airflow via Docker Compose
         run: |
           cd sources/batch_processing/airflow/dag-airflow
-          docker compose up -d
+          docker compose --env-file .env up -d
           echo "Chờ Airflow khởi động..."
-          sleep 30  # Tùy chỉnh nếu Airflow cần nhiều thời gian hơn
+          until docker exec -ti airflow-webserver airflow dags list | grep "example_dag"; do
+            echo "Đang chờ Airflow khởi động..."
+            sleep 30
+          done
 
       - name: Trigger Airflow DAG
         run: |
-          echo "Gọi Airflow REST API để trigger DAG"
-          # Giả sử: user=airflow, pass=airflow, dag_id=my_dag_id
-          # Lưu ý: thay 'my_dag_id' bằng tên DAG thực tế
-          curl -u "airflow:airflow" \
-               -X POST "http://localhost:8080/api/v1/dags/data_ingestion_aws_project/dagRuns" \
-               -H "Content-Type: application/json" \
-               -d '{ 
-                     "conf": {}, 
-                     "dag_run_id": "ci_cd_trigger_1" 
-                   }'
-          echo "Đợi 100 giây để DAG chạy"
-          sleep 100
+          echo "Triggering Airflow DAG..."
+          docker exec -ti airflow-webserver airflow dags trigger data_ingestion_dag
 
 
 
       - name: Monitor Airflow DAG
         run: |
-          echo "Monitoring DAG execution status..."
-          until [ "$(curl -u airflow:airflow -s \
-            -X GET "http://localhost:8080/api/v1/dags/data_ingestion_aws_project/dagRuns/ci_cd_trigger" | jq -r '.state')" = "success" ]; do
-            echo "DAG is still running..."
-            sleep 10
-          done
-          echo "DAG execution completed successfully."
+            echo "Monitoring DAG execution..."
+            while true; do
+              state=$(docker exec -ti airflow-webserver airflow dags list-runs --state running --dag-id data_ingestion_dag | grep running || true)
+              if [ -z "$state" ]; then
+                echo "DAG execution completed."
+                break
+              fi
+              echo "DAG is still running..."
+              sleep 10
+            done
           
 
       - name: Teardown Airflow
@@ -69,7 +84,7 @@ jobs:
       - name: Start Kafka
         run: |
           cd sources/stream_processing
-          docker compose up -d
+          docker compose --env-file .env up -d
           echo "Chờ Kafka khởi động..."
           sleep 15
 
@@ -97,15 +112,37 @@ jobs:
           # Hoặc dbt-bigquery, dbt-postgres... tùy DWH
 
       - name: dbt run for marketing_campaign_dwh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_KEY_ID: ${{ secrets.AWS_SECRET_KEY_ID }}
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_TABLE: ${{ secrets.SNOWFLAKE_TABLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
         run: |
-          cd sources/batch_processing/dbt/marketing_campaign_dwh
-          dbt deps
-          dbt run
-          dbt test
-
+            cd sources/batch_processing/dbt/marketing_campaign_dwh
+            dbt deps
+            dbt run
+            dbt test
+        
       - name: dbt run for marketing_datamart
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_KEY_ID: ${{ secrets.AWS_SECRET_KEY_ID }}
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_TABLE: ${{ secrets.SNOWFLAKE_TABLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
         run: |
-          cd sources/batch_processing/dbt/marketing_datamart
-          dbt deps
-          dbt run
-          dbt test
+            cd sources/batch_processing/dbt/marketing_datamart
+            dbt deps
+            dbt run
+            dbt test

@@ -1,0 +1,12 @@
+apache-airflow-providers-amazon 
+pyarrow
+apache-airflow-providers-snowflake
+kafka
+confluent_kafka 
+python-dotenv  
+fastavro   
+avro-python3
+
+apache-airflow
+boto3
+snowflake-connector-python

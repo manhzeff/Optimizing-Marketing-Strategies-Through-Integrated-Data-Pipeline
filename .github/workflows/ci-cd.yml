@@ -48,6 +48,21 @@ jobs:
           docker compose --env-file .env up -d
 
 
+      - name: Wait for Airflow Scheduler to be Ready
+        run: |
+              echo "Đang kiểm tra Scheduler..."
+              for i in {1..30}; do
+                STATUS=$(docker exec dtc-de-airflow-scheduler-1 airflow scheduler status 2>&1)
+                if echo "$STATUS" | grep -q "Scheduler is running"; then
+                  echo "Scheduler đã sẵn sàng."
+                  exit 0
+                fi
+                echo "Scheduler chưa sẵn sàng. Đang chờ..."
+                sleep 5
+              done
+              echo "Scheduler không sẵn sàng sau 2.5 phút."
+              exit 1
+
       - name: Verify Airflow DAGs
         run: |
           echo "Checking if DAG 'data_ingestion_aws_project' exists..."
@@ -64,29 +79,24 @@ jobs:
         run: |
           echo "Triggering Airflow DAG..."
           docker exec -i dtc-de-airflow-webserver-1 airflow dags trigger data_ingestion_aws_project
-          docker exec -i dtc-de-airflow-scheduler-1 airflow dags trigger data_ingestion_aws_project
+
 
 
       - name: Monitor Airflow DAG
         run: |
-          MAX_RETRIES=30
-          COUNT=0
-          while [ $COUNT -lt $MAX_RETRIES ]; do
-            state=$(docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --state running --dag-id data_ingestion_aws_project | grep running)
+          echo "Monitoring DAG execution progress..."
+          while true; do
+            echo "Fetching DAG runs for 'data_ingestion_aws_project'..."
+            docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project
+            state=$(docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --state running --dag-id data_ingestion_aws_project | grep running || true)
             if [ -z "$state" ]; then
-              echo "DAG đã hoàn thành."
+              echo "DAG execution completed."
               docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project
               break
             fi
-            echo "DAG vẫn đang chạy. Thử lại lần $((COUNT+1))/$MAX_RETRIES."
-            COUNT=$((COUNT + 1))
+            echo "DAG is still running. Checking again in 10 seconds..."
             sleep 10
           done
-
-          if [ $COUNT -eq $MAX_RETRIES ]; then
-            echo "DAG không hoàn thành trong thời gian mong đợi."
-            exit 1
-          fi
           
 
       - name: Teardown Airflow

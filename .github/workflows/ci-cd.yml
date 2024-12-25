@@ -47,7 +47,7 @@ jobs:
           cd sources/batch_processing/airflow/dag-airflow
           docker compose --env-file .env up -d
           echo "Chờ Airflow khởi động..."
-          until docker exec -ti dtc-de-airflow-webserver-1 airflow dags list | grep "example_dag"; do
+          until docker exec -i dtc-de-airflow-webserver-1 airflow dags list | grep "example_dag"; do
             echo "Đang chờ Airflow khởi động..."
             sleep 30
           done
@@ -55,7 +55,7 @@ jobs:
       - name: Trigger Airflow DAG
         run: |
           echo "Triggering Airflow DAG..."
-          docker exec -ti dtc-de-airflow-webserver-1 airflow dags trigger data_ingestion_dag
+          docker exec -i dtc-de-airflow-webserver-1 airflow dags trigger data_ingestion_dag
 
 
 
@@ -63,7 +63,7 @@ jobs:
         run: |
             echo "Monitoring DAG execution..."
             while true; do
-              state=$(docker exec -ti dtc-de-airflow-webserver-1 airflow dags list-runs --state running --dag-id data_ingestion_dag | grep running || true)
+              state=$(docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --state running --dag-id data_ingestion_dag | grep running || true)
               if [ -z "$state" ]; then
                 echo "DAG execution completed."
                 break

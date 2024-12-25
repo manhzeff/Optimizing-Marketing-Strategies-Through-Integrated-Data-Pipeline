@@ -83,7 +83,7 @@ jobs:
           webserver_container=$(docker ps --filter "name=webserver" --format "{{.ID}}")
           if docker exec $webserver_container airflow dags list | grep -q 'data_ingestion_aws_project'; then
             echo "DAG found. Triggering..."
-            docker exec $webserver_container airflow dags trigger data_ingestion_aws_project
+            docker exec -it $webserver_container airflow dags trigger data_ingestion_aws_project
           else
             echo "DAG not found."
             exit 1

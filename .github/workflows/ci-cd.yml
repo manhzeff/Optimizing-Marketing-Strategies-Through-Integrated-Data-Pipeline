@@ -68,7 +68,7 @@ jobs:
             scheduler_status=$(docker exec -i dtc-de-airflow-webserver-1 ps aux | grep -v grep | grep airflow-scheduler || true)
             if [ -z "$scheduler_status" ]; then
               echo "Scheduler is not running. Restarting Scheduler..."
-              docker exec -i dtc-de-airflow-webserver-1 pkill -f 'airflow scheduler' || true
+              docker exec -i dtc-de-airflow-webserver-1 bash -c "ps aux | grep 'airflow scheduler' | awk '{print \$2}' | xargs kill -9 || true"
               docker exec -i dtc-de-airflow-webserver-1 airflow scheduler &
               sleep 5
             else
@@ -80,8 +80,8 @@ jobs:
             worker_status=$(docker exec -i dtc-de-airflow-worker-1 ps aux | grep -v grep | grep 'celery worker' || true)
             if [ -z "$worker_status" ]; then
               echo "Worker is not running. Cleaning up stale processes and restarting Worker..."
-              docker exec -i dtc-de-airflow-worker-1 pkill -f 'celery worker' || true
-              docker exec -i dtc-de-airflow-worker-1 rm -f /opt/airflow/airflow-worker.pid || true
+              docker exec -i dtc-de-airflow-worker-1 bash -c "ps aux | grep 'celery worker' | awk '{print \$2}' | xargs kill -9 || true"
+              docker exec -i dtc-de-airflow-worker-1 bash -c "rm -f /opt/airflow/airflow-worker.pid || true"
               docker exec -i dtc-de-airflow-worker-1 airflow celery worker &
               sleep 5
             else
@@ -89,6 +89,7 @@ jobs:
             fi
   
             echo "Scheduler and Worker checks completed."
+  
   
 
 

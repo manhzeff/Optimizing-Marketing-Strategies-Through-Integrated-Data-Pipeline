@@ -68,16 +68,19 @@ jobs:
 
       - name: Monitor Airflow DAG
         run: |
-            echo "Monitoring DAG execution..."
-            while true; do
-              state=$(docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --state running --dag-id data_ingestion_aws_project | grep running || true)
-              if [ -z "$state" ]; then
-                echo "DAG execution completed."
-                break
-              fi
-              echo "DAG is still running..."
-              sleep 10
-            done
+          echo "Monitoring DAG execution progress..."
+          while true; do
+            echo "Fetching DAG runs for 'data_ingestion_aws_project'..."
+            docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project
+            state=$(docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --state running --dag-id data_ingestion_aws_project | grep running || true)
+            if [ -z "$state" ]; then
+              echo "DAG execution completed."
+              docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project
+              break
+            fi
+            echo "DAG is still running. Checking again in 10 seconds..."
+            sleep 10
+          done
           
 
       - name: Teardown Airflow

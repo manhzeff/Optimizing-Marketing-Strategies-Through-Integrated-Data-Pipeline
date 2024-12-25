@@ -72,14 +72,25 @@ jobs:
           while true; do
             echo "Fetching DAG runs for 'data_ingestion_aws_project'..."
             docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project
-            state=$(docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --state running --dag-id data_ingestion_aws_project | grep running || true)
+            state=$(docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project --state running | grep running || true)
             if [ -z "$state" ]; then
-              echo "DAG execution completed."
-              docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project
-              break
+              state_queued=$(docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project --state queued | grep queued || true)
+              if [ -z "$state_queued" ]; then
+                echo "DAG execution completed or no queued tasks remain."
+                docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project
+                break
+              else
+                echo "DAG is still queued. Investigating potential issues..."
+                echo "Checking Scheduler logs..."
+                docker logs dtc-de-airflow-scheduler-1 | tail -n 20
+                echo "Checking Webserver logs..."
+                docker logs dtc-de-airflow-webserver-1 | tail -n 20
+                sleep 10
+              fi
+            else
+              echo "DAG is running. Checking again in 10 seconds..."
+              sleep 10
             fi
-            echo "DAG is still running. Checking again in 10 seconds..."
-            sleep 10
           done
           
 

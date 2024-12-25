@@ -10,128 +10,117 @@ on:
 jobs:
   end_to_end_pipeline:
     runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_KEY_ID: ${{ secrets.AWS_SECRET_KEY_ID }}
+      AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+      SNOWFLAKE_TABLE: ${{ secrets.SNOWFLAKE_TABLE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
 
     steps:
-      # 1. Check out mã nguồn
       - name: Check out repo
         uses: actions/checkout@v3
 
-      # 2. Thiết lập Docker Buildx (nếu cần build image)
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      # 3. Create .env file
-      - name: Create .env file from Secrets
-        run: |
-          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
-          echo "AWS_SECRET_KEY_ID=${{ secrets.AWS_SECRET_KEY_ID }}" >> .env
-          echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}" >> .env
-          echo "SNOWFLAKE_ACCOUNT=${{ secrets.SNOWFLAKE_ACCOUNT }}" >> .env
-          echo "SNOWFLAKE_USER=${{ secrets.SNOWFLAKE_USER }}" >> .env
-          echo "SNOWFLAKE_PASSWORD=${{ secrets.SNOWFLAKE_PASSWORD }}" >> .env
-          echo "SNOWFLAKE_DATABASE=${{ secrets.SNOWFLAKE_DATABASE }}" >> .env
-          echo "SNOWFLAKE_SCHEMA=${{ secrets.SNOWFLAKE_SCHEMA }}" >> .env
-          echo "SNOWFLAKE_TABLE=${{ secrets.SNOWFLAKE_TABLE }}" >> .env
-          echo "SNOWFLAKE_WAREHOUSE=${{ secrets.SNOWFLAKE_WAREHOUSE }}" >> .env
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-      - name: Set up Python environment and install dependencies
+      - name: Install dependencies
         run: |
-          python3 -m venv venv
-          source venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Start Airflow via Docker Compose
+      - name: Create .env file from Secrets
+        run: |
+          cat <<EOF > .env
+          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_KEY_ID=${AWS_SECRET_KEY_ID}
+          AWS_S3_BUCKET=${AWS_S3_BUCKET}
+          SNOWFLAKE_ACCOUNT=${SNOWFLAKE_ACCOUNT}
+          SNOWFLAKE_USER=${SNOWFLAKE_USER}
+          SNOWFLAKE_PASSWORD=${SNOWFLAKE_PASSWORD}
+          SNOWFLAKE_DATABASE=${SNOWFLAKE_DATABASE}
+          SNOWFLAKE_SCHEMA=${SNOWFLAKE_SCHEMA}
+          SNOWFLAKE_TABLE=${SNOWFLAKE_TABLE}
+          SNOWFLAKE_WAREHOUSE=${SNOWFLAKE_WAREHOUSE}
+          EOF
+
+      - name: Start Airflow
         run: |
           cd sources/batch_processing/airflow/dag-airflow
           docker compose --env-file .env up -d
 
-
-      - name: Verify Airflow DAGs
+      - name: Wait for Airflow
         run: |
-          echo "Checking if DAG 'data_ingestion_aws_project' exists..."
-          dag_list=$(docker exec -i dtc-de-airflow-webserver-1 airflow dags list | grep 'data_ingestion_aws_project' || true)
-          if [ -z "$dag_list" ]; then
-            echo "Error: DAG 'data_ingestion_aws_project' not found."
-            exit 1
-          else
-            echo "DAG 'data_ingestion_aws_project' is available."
-          fi
-      
-      - name: Check and Restart Scheduler and Worker
-        run: |
-            echo "Checking Airflow Scheduler and Worker status..."
-  
-            # Check Scheduler
-            echo "Checking Scheduler..."
-            scheduler_status=$(docker exec -i dtc-de-airflow-webserver-1 ps aux | grep -v grep | grep airflow-scheduler || true)
-            if [ -z "$scheduler_status" ]; then
-              echo "Scheduler is not running. Restarting Scheduler..."
-              docker exec -i dtc-de-airflow-webserver-1 bash -c "ps aux | grep 'airflow scheduler' | awk '{print \$2}' | xargs kill -9 || true"
-              docker exec -i dtc-de-airflow-webserver-1 airflow scheduler &
-              sleep 5
-            else
-              echo "Scheduler is running."
-            fi
-  
-            # Check Worker (for CeleryExecutor)
-            echo "Checking Worker..."
-            worker_status=$(docker exec -i dtc-de-airflow-worker-1 ps aux | grep -v grep | grep 'celery worker' || true)
-            if [ -z "$worker_status" ]; then
-              echo "Worker is not running. Cleaning up stale processes and restarting Worker..."
-              docker exec -i dtc-de-airflow-worker-1 bash -c "ps aux | grep 'celery worker' | awk '{print \$2}' | xargs kill -9 || true"
-              docker exec -i dtc-de-airflow-worker-1 bash -c "rm -f /opt/airflow/airflow-worker.pid || true"
-              docker exec -i dtc-de-airflow-worker-1 airflow celery worker &
-              sleep 5
-            else
-              echo "Worker is running."
-            fi
-  
-            echo "Scheduler and Worker checks completed."
-  
-  
-
-
-
-
-      - name: Trigger Airflow DAG
-        run: |
-          echo "Triggering Airflow DAG..."
-          docker exec -i dtc-de-airflow-webserver-1 airflow dags trigger data_ingestion_aws_project
-
-
-
-      - name: Monitor Airflow DAG
-        run: |
-          echo "Monitoring DAG execution progress..."
-          while true; do
-            echo "Fetching DAG runs for 'data_ingestion_aws_project'..."
-            docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project
-            state=$(docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --state running --dag-id data_ingestion_aws_project | grep running || true)
-            if [ -z "$state" ]; then
-              echo "DAG execution completed."
-              docker exec -i dtc-de-airflow-webserver-1 airflow dags list-runs --dag-id data_ingestion_aws_project
+          for i in {1..30}; do
+            if curl -sSf http://localhost:8080/health > /dev/null; then
+              echo "Airflow is up!"
               break
             fi
-            echo "DAG is still running. Checking again in 10 seconds..."
-            sleep 10
+            echo "Waiting for Airflow..."
+            sleep 5
           done
-          
+
+      - name: Verify and Trigger DAG
+        run: |
+          webserver_container=$(docker ps --filter "name=webserver" --format "{{.ID}}")
+          if docker exec $webserver_container airflow dags list | grep -q 'data_ingestion_aws_project'; then
+            echo "DAG found. Triggering..."
+            docker exec $webserver_container airflow dags trigger data_ingestion_aws_project
+          else
+            echo "DAG not found."
+            exit 1
+          fi
+
+      - name: Monitor DAG
+        run: |
+          timeout=600
+          interval=10
+          elapsed=0
+          webserver_container=$(docker ps --filter "name=webserver" --format "{{.ID}}")
+          while [ $elapsed -lt $timeout ]; do
+            if ! docker exec $webserver_container airflow dags list-runs --dag-id data_ingestion_aws_project | grep -q 'running'; then
+              echo "DAG execution completed."
+              docker exec $webserver_container airflow dags list-runs --dag-id data_ingestion_aws_project
+              break
+            fi
+            echo "DAG is still running. Checking again in $interval seconds..."
+            sleep $interval
+            elapsed=$((elapsed + interval))
+          done
+          if [ $elapsed -ge $timeout ]; then
+            echo "DAG execution timed out."
+            exit 1
+          fi
 
       - name: Teardown Airflow
+        if: always()
         run: |
           cd sources/batch_processing/airflow/dag-airflow
           docker compose down
 
-      # -----------------------------------------------------------
-      # 4. Khởi động Kafka & Chạy producer + consumer
-      # -----------------------------------------------------------
       - name: Start Kafka
         run: |
           cd sources/stream_processing
           docker compose --env-file .env up -d
-          echo "Chờ Kafka khởi động..."
+          echo "Waiting for Kafka to start..."
           sleep 15
 
       - name: Run Kafka Producer
@@ -145,50 +134,34 @@ jobs:
           python consumer.py
 
       - name: Teardown Kafka
+        if: always()
         run: |
           cd sources/stream_processing
           docker compose down
 
-      # -----------------------------------------------------------
-      # 6. Cài dbt & chạy dbt run (DWH & Data Mart)
-      # -----------------------------------------------------------
+      - name: Cache dbt packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.dbt
+          key: ${{ runner.os }}-dbt-${{ hashFiles('**/packages.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-dbt-
+
       - name: Install dbt
         run: |
           pip install dbt-core dbt-snowflake
-          # Hoặc dbt-bigquery, dbt-postgres... tùy DWH
 
-      - name: dbt run for marketing_campaign_dwh
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_KEY_ID: ${{ secrets.AWS_SECRET_KEY_ID }}
-          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-          SNOWFLAKE_TABLE: ${{ secrets.SNOWFLAKE_TABLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      - name: dbt run for DWH
         run: |
-            cd sources/batch_processing/dbt/marketing_campaign_dwh
-            dbt deps
-            dbt run
-            dbt test
-        
-      - name: dbt run for marketing_datamart
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_KEY_ID: ${{ secrets.AWS_SECRET_KEY_ID }}
-          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-          SNOWFLAKE_TABLE: ${{ secrets.SNOWFLAKE_TABLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          cd sources/batch_processing/dbt/marketing_campaign_dwh
+          dbt deps
+          dbt run
+          dbt test
+
+      - name: dbt run for Data Mart
         run: |
-            cd sources/batch_processing/dbt/marketing_datamart
-            dbt deps
-            dbt run
-            dbt test
+          cd sources/batch_processing/dbt/marketing_datamart
+          dbt deps
+          dbt run
+          dbt test
+

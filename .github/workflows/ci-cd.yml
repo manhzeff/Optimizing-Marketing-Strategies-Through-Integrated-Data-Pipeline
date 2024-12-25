@@ -61,31 +61,35 @@ jobs:
       
       - name: Check and Restart Scheduler and Worker
         run: |
-          echo "Checking Airflow Scheduler and Worker status..."
-
-          # Check Scheduler
-          echo "Checking Scheduler..."
-          scheduler_status=$(docker exec -i dtc-de-airflow-webserver-1 ps aux | grep -v grep | grep airflow-scheduler || true)
-          if [ -z "$scheduler_status" ]; then
-            echo "Scheduler is not running. Restarting Scheduler..."
-            docker exec -i dtc-de-airflow-webserver-1 airflow scheduler &
-            sleep 5
-          else
-            echo "Scheduler is running."
-          fi
-
-          # Check Worker (for CeleryExecutor)
-          echo "Checking Worker..."
-          worker_status=$(docker exec -i dtc-de-airflow-worker-1 ps aux | grep -v grep | grep 'celery worker' || true)
-          if [ -z "$worker_status" ]; then
-            echo "Worker is not running. Restarting Worker..."
-            docker exec -i dtc-de-airflow-worker-1 airflow celery worker &
-            sleep 5
-          else
-            echo "Worker is running."
-          fi
-
-          echo "Scheduler and Worker checks completed."
+            echo "Checking Airflow Scheduler and Worker status..."
+  
+            # Check Scheduler
+            echo "Checking Scheduler..."
+            scheduler_status=$(docker exec -i dtc-de-airflow-webserver-1 ps aux | grep -v grep | grep airflow-scheduler || true)
+            if [ -z "$scheduler_status" ]; then
+              echo "Scheduler is not running. Restarting Scheduler..."
+              docker exec -i dtc-de-airflow-webserver-1 pkill -f 'airflow scheduler' || true
+              docker exec -i dtc-de-airflow-webserver-1 airflow scheduler &
+              sleep 5
+            else
+              echo "Scheduler is running."
+            fi
+  
+            # Check Worker (for CeleryExecutor)
+            echo "Checking Worker..."
+            worker_status=$(docker exec -i dtc-de-airflow-worker-1 ps aux | grep -v grep | grep 'celery worker' || true)
+            if [ -z "$worker_status" ]; then
+              echo "Worker is not running. Cleaning up stale processes and restarting Worker..."
+              docker exec -i dtc-de-airflow-worker-1 pkill -f 'celery worker' || true
+              docker exec -i dtc-de-airflow-worker-1 rm -f /opt/airflow/airflow-worker.pid || true
+              docker exec -i dtc-de-airflow-worker-1 airflow celery worker &
+              sleep 5
+            else
+              echo "Worker is running."
+            fi
+  
+            echo "Scheduler and Worker checks completed."
+  
 
 
 

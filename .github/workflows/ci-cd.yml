@@ -69,7 +69,7 @@ jobs:
 
       - name: Wait for Airflow
         run: |
-            for i in {1..60}; do
+            for i in {1..120}; do
               if curl -sSf http://localhost:8080/health > /dev/null; then
                 echo "Airflow is up!"
                 break
@@ -88,12 +88,17 @@ jobs:
           cd sources/batch_processing/airflow/dag-airflow
           docker compose ps
 
-      - name: Fetch Scheduler Logs
+      - name: Fetch Logs if Services Not Healthy
         if: failure()
         run: |
-          cd sources/batch_processing/airflow/dag-airflow
-          docker compose logs scheduler > scheduler.log
-          cat scheduler.log
+            cd sources/batch_processing/airflow/dag-airflow
+            docker compose logs airflow-webserver > webserver.log
+            docker compose logs airflow-scheduler > scheduler.log
+            docker compose logs airflow-worker > worker.log
+            cat webserver.log
+            cat scheduler.log
+            cat worker.log
+        
 
       - name: Verify and Trigger DAG
         run: |

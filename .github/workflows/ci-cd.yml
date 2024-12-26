@@ -85,11 +85,13 @@ jobs:
 
       - name: Verify Airflow Services
         run: |
+          cd sources/batch_processing/airflow/dag-airflow
           docker compose ps
 
       - name: Fetch Scheduler Logs
         if: failure()
         run: |
+          cd sources/batch_processing/airflow/dag-airflow
           docker compose logs scheduler > scheduler.log
           cat scheduler.log
 

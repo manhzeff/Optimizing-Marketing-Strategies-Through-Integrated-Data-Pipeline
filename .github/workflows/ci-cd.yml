@@ -69,14 +69,29 @@ jobs:
 
       - name: Wait for Airflow
         run: |
-          for i in {1..30}; do
-            if curl -sSf http://localhost:8080/health > /dev/null; then
-              echo "Airflow is up!"
-              break
+            for i in {1..60}; do
+              if curl -sSf http://localhost:8080/health > /dev/null; then
+                echo "Airflow is up!"
+                break
+              fi
+              echo "Waiting for Airflow... ($i/60)"
+              sleep 5
+            done
+            if ! curl -sSf http://localhost:8080/health > /dev/null; then
+              echo "Airflow failed to start."
+              exit 1
             fi
-            echo "Waiting for Airflow..."
-            sleep 5
-          done
+
+
+      - name: Verify Airflow Services
+        run: |
+          docker compose ps
+
+      - name: Fetch Scheduler Logs
+        if: failure()
+        run: |
+          docker compose logs scheduler > scheduler.log
+          cat scheduler.log
 
       - name: Verify and Trigger DAG
         run: |
@@ -96,10 +111,14 @@ jobs:
           elapsed=0
           webserver_container=$(docker ps --filter "name=webserver" --format "{{.ID}}")
           while [ $elapsed -lt $timeout ]; do
-            if ! docker exec $webserver_container airflow dags list-runs --dag-id data_ingestion_aws_project | grep -q 'running'; then
-              echo "DAG execution completed."
-              docker exec $webserver_container airflow dags list-runs --dag-id data_ingestion_aws_project
+            dag_state=$(docker exec $webserver_container airflow dags state data_ingestion_aws_project $(date -Iseconds))
+            echo "Current DAG state: $dag_state"
+            if [[ "$dag_state" == "success" ]]; then
+              echo "DAG execution completed successfully."
               break
+            elif [[ "$dag_state" == "failed" ]]; then
+              echo "DAG execution failed."
+              exit 1
             fi
             echo "DAG is still running. Checking again in $interval seconds..."
             sleep $interval

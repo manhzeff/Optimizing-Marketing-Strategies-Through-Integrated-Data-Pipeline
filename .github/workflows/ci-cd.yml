@@ -72,24 +72,30 @@ jobs:
 
       - name: Start Airflow
         run: |
-          cd sources/batch_processing/airflow/dag-airflow
-          docker compose --env-file .env up -d
-
-      - name: Wait for Airflow
-        run: |
-            for i in {1..120}; do
-              if curl -sSf http://localhost:8080/health > /dev/null; then
-                echo "Airflow is up!"
+            cd sources/batch_processing/airflow/dag-airflow
+            docker compose --env-file .env up -d
+            echo "Đang chờ Airflow khởi động..."
+            for i in {1..240}; do  # Tối đa 20 phút (240 * 5 giây)
+              # Kiểm tra trạng thái sức khỏe của tất cả các dịch vụ
+              unhealthy_services=$(docker compose ps --filter "health!=healthy" --format "{{.Name}}: {{.Health}}")
+              if [ -z "$unhealthy_services" ]; then
+                echo "Tất cả các dịch vụ Airflow đã khỏe mạnh."
                 break
               fi
-              echo "Waiting for Airflow... ($i/60)"
+              echo "Đang chờ các dịch vụ Airflow trở nên khỏe mạnh... ($i/240)"
+              echo "Các dịch vụ chưa khỏe mạnh:"
+              echo "$unhealthy_services"
               sleep 5
             done
-            if ! curl -sSf http://localhost:8080/health > /dev/null; then
-              echo "Airflow failed to start."
+            
+            # Kiểm tra lần cuối để đảm bảo tất cả dịch vụ đã khỏe mạnh
+            unhealthy_services=$(docker compose ps --filter "health!=healthy" --format "{{.Name}}: {{.Health}}")
+            if [ -n "$unhealthy_services" ]; then
+              echo "Một số dịch vụ Airflow không trở nên khỏe mạnh:"
+              echo "$unhealthy_services"
               exit 1
             fi
-
+        
 
       - name: Verify Airflow Services
         run: |
@@ -114,31 +120,6 @@ jobs:
           # Ghi nhận dag_run_id vào biến môi trường GitHub
           echo "DAG_RUN_ID=$dag_run_id" >> $GITHUB_ENV
 
-          
-      - name: Monitor DAG
-        run: |
-          timeout=600
-          interval=10
-          elapsed=0
-          webserver_container=$(docker ps --filter "name=webserver" --format "{{.ID}}")
-          while [ $elapsed -lt $timeout ]; do
-            dag_state=$(docker exec $webserver_container airflow dags state data_ingestion_aws_project $(date -Iseconds))
-            echo "Current DAG state: $dag_state"
-            if [[ "$dag_state" == "success" ]]; then
-              echo "DAG execution completed successfully."
-              break
-            elif [[ "$dag_state" == "failed" ]]; then
-              echo "DAG execution failed."
-              exit 1
-            fi
-            echo "DAG is still running. Checking again in $interval seconds..."
-            sleep $interval
-            elapsed=$((elapsed + interval))
-          done
-          if [ $elapsed -ge $timeout ]; then
-            echo "DAG execution timed out."
-            exit 1
-          fi
 
       - name: Teardown Airflow
         if: always()

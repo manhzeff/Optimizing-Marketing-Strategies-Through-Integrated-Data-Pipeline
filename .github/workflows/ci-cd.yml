@@ -39,6 +39,12 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Install jq
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y jq
+        
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -81,8 +87,40 @@ jobs:
       - name: Trigger DAG via Airflow API
         id: trigger_dag
         run: |
-            docker exec -i dtc-de-airflow-webserver-1 airflow dags trigger data_ingestion_aws_project
-
+            RESPONSE=$(docker exec -i airflow-webserver airflow dags trigger $DAG_ID --conf '{"trigger_source": "github_actions"}')
+            echo "Trigger response: $RESPONSE"
+  
+      - name: Extract DagRun ID
+        id: extract_dagrun
+        run: |
+            # Assuming the response contains the DagRun ID, extract it
+            DAG_RUN_ID=$(echo "$RESPONSE" | grep -oP '(?<=@ ).*(?=: state)')
+            echo "::set-output name=dag_run_id::$DAG_RUN_ID"
+  
+      - name: Wait for DAG Run to Start Running
+        run: |
+            DAG_RUN_ID=${{ steps.extract_dagrun.outputs.dag_run_id }}
+            MAX_RETRIES=30
+            RETRY_COUNT=0
+            SLEEP_TIME=10
+  
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              STATUS=$(curl -s -u $AIRFLOW_USERNAME:$AIRFLOW_PASSWORD "$AIRFLOW_API_URL/dags/$DAG_ID/dagRuns/$DAG_RUN_ID" | jq -r '.state')
+              echo "Current DagRun Status: $STATUS"
+              if [ "$STATUS" == "running" ] || [ "$STATUS" == "success" ]; then
+                echo "DagRun has started running or completed successfully."
+                exit 0
+              elif [ "$STATUS" == "failed" ] || [ "$STATUS" == "upstream_failed" ]; then
+                echo "DagRun has failed."
+                exit 1
+              fi
+              echo "DagRun is still in '$STATUS' state. Retrying in $SLEEP_TIME seconds..."
+              sleep $SLEEP_TIME
+              RETRY_COUNT=$((RETRY_COUNT+1))
+            done
+  
+            echo "DagRun did not start running within the expected time."
+            exit 1
 
 
 

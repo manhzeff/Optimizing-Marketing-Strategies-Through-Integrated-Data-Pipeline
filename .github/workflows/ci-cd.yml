@@ -81,7 +81,8 @@ jobs:
       - name: Trigger DAG via Airflow API
         id: trigger_dag
         run: |
-            docker exec -i dtc-de-airflow-webserver-1 airflow dags trigger -d data_ingestion_aws_project
+            docker exec -i dtc-de-airflow-webserver-1 airflow dags trigger --dag-id data_ingestion_aws_project
+
 
 
 

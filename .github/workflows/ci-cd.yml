@@ -69,7 +69,7 @@ jobs:
             cd sources/batch_processing/airflow/dag-airflow
             docker compose --env-file .env up -d
             echo "chờ airflow to start"
-            sleep(120)
+            sleep 120
 
       - name: Verify Airflow Services
         run: |

@@ -93,7 +93,6 @@ jobs:
       - name: Extract DagRun ID
         id: extract_dagrun
         run: |
-            # Giả sử RESPONSE là một chuỗi như: Created <DagRun data_ingestion_aws_project @ 2024-12-27T14:54:53+00:00: manual__2024-12-27T14:54:53+00:00, state:queued, ...>
             DAG_RUN_ID=$(echo "$RESPONSE" | grep -oP '(?<=@ ).*(?=: state)')
             echo "dag_run_id=$DAG_RUN_ID" >> $GITHUB_OUTPUT
   

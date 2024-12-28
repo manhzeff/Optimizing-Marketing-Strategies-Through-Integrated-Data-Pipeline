@@ -85,19 +85,45 @@ jobs:
         
 
       - name: Trigger DAG via Airflow API
+        id: trigger_dag
         run: |
             AIRFLOW_HOST=localhost
             AIRFLOW_PORT=8080
             DAG_ID=data_ingestion_aws_project
             AUTH_HEADER="Authorization: Basic $(echo -n 'airflow:airflow' | base64)"
-            curl -X POST "http://$AIRFLOW_HOST:$AIRFLOW_PORT/api/v1/dags/$DAG_ID/dagRuns" \
+  
+            # Trigger the DAG and extract the dag_run_id
+            DAG_RUN_RESPONSE=$(curl -s -X POST "http://$AIRFLOW_HOST:$AIRFLOW_PORT/api/v1/dags/$DAG_ID/dagRuns" \
               -H "Content-Type: application/json" \
               -H "$AUTH_HEADER" \
-              -d '{}'
+              -d '{}')
+            
+            echo "DAG Run Response: $DAG_RUN_RESPONSE"
+            DAG_RUN_ID=$(echo "$DAG_RUN_RESPONSE" | jq -r '.dag_run_id')
+            echo "DAG Run ID: $DAG_RUN_ID"
+  
+            # Wait for the DAG to run
             sleep 120
+  
+      - name: Check DAG Run Status
+        run: |
+            AIRFLOW_HOST=localhost
+            AIRFLOW_PORT=8080
+            DAG_ID=data_ingestion_aws_project
+            AUTH_HEADER="Authorization: Basic $(echo -n 'airflow:airflow' | base64)"
+            DAG_RUN_ID=${DAG_RUN_ID}
+  
+            # Check the status of the DAG Run
+            DAG_STATUS=$(curl -s -X GET "http://$AIRFLOW_HOST:$AIRFLOW_PORT/api/v1/dags/$DAG_ID/dagRuns/$DAG_RUN_ID" \
+              -H "$AUTH_HEADER" | jq -r '.state')
+            echo "DAG Run Status: $DAG_STATUS"
+  
+            if [ "$DAG_STATUS" != "success" ]; then
+              echo "DAG Run failed or is not successful!"
+              exit 1
+            fi
+  
         
-
-
 
 
       - name: Teardown Airflow

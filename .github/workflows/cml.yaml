@@ -1,0 +1,42 @@
+name: CML Pipeline
+
+on:
+  push:
+    branches: [ "dev-manh" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  run-cml:
+    runs-on: ubuntu-latest
+    container: docker://dvcorg/cml-py3:latest  # Image có DVC, CML, Python sẵn
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up environment
+        run: |
+          pip install -r requirements.txt
+          pip install snowflake-connector-python
+
+      - name: Reproduce pipeline
+        env:
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA}}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_TABLE: ${{ secrets.SNOWFLAKE_TABLE }}
+
+        run: dvc repro
+
+      - name: Push DVC outputs
+        if: always()
+        run: dvc push
+
+      - name: Report metrics with CML
+        run: |
+          echo "## Training Metrics" > report.md
+          cat metrics.txt >> report.md  # metrics.txt do train.py sinh ra
+          cml comment create report.md --pr

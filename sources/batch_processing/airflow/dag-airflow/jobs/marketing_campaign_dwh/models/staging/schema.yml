@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+    - name: COMPUTE_WH
+      database: test
+      schema: PUBLIC
+      tables:
+        - name: MARKETING_SPARK
+
+models:
+  - name: stg_marketing
+    description: staging layer for bank campaign data warehouses

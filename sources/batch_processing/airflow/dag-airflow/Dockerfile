@@ -8,10 +8,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 WORKDIR $AIRFLOW_HOME
 
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 USER root
 RUN apt update -y
 RUN apt install default-jdk -y
 RUN apt install git -y
+
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+RUN export JAVA_HOME
+
+
 USER airflow
 RUN pip install pandas
+RUN pip install dbt-snowflake

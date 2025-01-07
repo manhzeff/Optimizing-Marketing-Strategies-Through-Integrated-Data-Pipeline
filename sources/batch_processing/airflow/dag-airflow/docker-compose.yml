@@ -39,6 +39,8 @@
 # Feel free to modify this file to suit your needs.
 ---
 version: '3'
+
+
 x-airflow-common:
   &airflow-common
   # In order to add custom dependencies or upgrade provider packages you can use your extended image.
@@ -63,6 +65,8 @@ x-airflow-common:
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     AWS_REGION: ${AWS_REGION}
     AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+  
+
     # REDSHIFT_SCHEMA: ${REDSHIFT_SCHEMA}
     # REDSHIFT_TABLE: ${REDSHIFT_TABLE}
     # REDSHIFT_IAM_ROLE: ${REDSHIFT_IAM_ROLE}
@@ -71,6 +75,7 @@ x-airflow-common:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
+    - ./jobs:/opt/airflow/jobs
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -275,6 +280,9 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+
+
+  
 
 volumes:
   postgres-db-volume:

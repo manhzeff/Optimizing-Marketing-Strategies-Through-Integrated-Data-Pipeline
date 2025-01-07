@@ -12,7 +12,10 @@ jobs:
     container: docker://dvcorg/cml-py3:latest  # Image có DVC, CML, Python sẵn
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
+
+      - name: Set up
+        uses: iterative/setup-tools@v1
 
       - name: Set up environment
         run: |

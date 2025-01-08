@@ -1,45 +1,43 @@
-name: CML Pipeline
+name: model-training
 
 on:
   push:
-    branches: [ "dev-manh" ]
+    branches: ["dev-manh"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
-  run-cml:
+  run:
     runs-on: ubuntu-latest
-    container: docker://dvcorg/cml-py3:latest  # Image có DVC, CML, Python sẵn
+    container: ghcr.io/iterative/cml:0-dvc2-base1
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Set up
-        uses: iterative/setup-tools@v1
-
-      - name: Set up environment
-        run: |
-          pip install -r requirements.txt
-          pip install snowflake-connector-python
-
-      - name: Reproduce pipeline
+      - name: Train model
         env:
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA}}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_TABLE: ${{ secrets.SNOWFLAKE_TABLE }}
 
-        run: dvc repro
-
-      - name: Push DVC outputs
-        if: always()
-        run: dvc push
-
-      - name: Report metrics with CML
         run: |
+          # Cài đặt các thư viện cần thiết
+          pip install -r requirements.txt
+          pip install snowflake-connector-python
+          
+          # Thực thi pipeline
+          dvc repro
+
+          # Đẩy kết quả (outputs) lên remote storage (nếu dùng DVC remote)
+          dvc push
+
+          # Xuất báo cáo metrics
           echo "## Training Metrics" > report.md
-          cat metrics.txt >> report.md  # metrics.txt do train.py sinh ra
+          # Giả sử metrics.txt được sinh ra trong quá trình train
+          cat metrics.txt >> report.md
+
+          # Tạo comment lên Pull Request với CML
           cml comment create report.md --pr

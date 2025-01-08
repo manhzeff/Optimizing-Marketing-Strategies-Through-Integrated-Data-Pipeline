@@ -44,7 +44,7 @@ def get_data_from_snowflake(
         ENGAGEMENT_SCORE,
         CUSTOMER_SEGMENT,
         DATE
-    FROM CAMPAIGN_DATA_TEST
+    FROM CAMPAIN_DATA_TEST
     """
 
     # Thực hiện truy vấn

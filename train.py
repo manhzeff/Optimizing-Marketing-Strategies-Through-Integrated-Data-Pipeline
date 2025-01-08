@@ -57,13 +57,13 @@ def main():
 
     # Thiết lập index (nếu cần)
     # Tuỳ thuộc vào dữ liệu thực tế của bạn. Ở đây giả sử cột "Campaign_ID" tồn tại.
-    if "Campaign_ID" in df.columns:
-        df = df.set_index("Campaign_ID")
+    if "CAMPAIGN_ID" in df.columns:
+        df = df.set_index("CAMPAIGN_ID")
 
     # Kiểm tra cột Duration, chuyển sang số
-    if "Duration" in df.columns:
-        df['Duration'] = df['Duration'].str.extract(r'(\d+)', expand=False)
-        df['Duration'] = pd.to_numeric(df['Duration'], errors='coerce')
+    if "DURATION" in df.columns:
+        df['DURATION'] = df['DURATION'].str.extract(r'(\d+)', expand=False)
+        df['DURATION'] = pd.to_numeric(df['DURATION'], errors='coerce')
 
     # Thống kê thông tin
     print(df.info())
@@ -81,16 +81,16 @@ def main():
 
     # Feature Engineering: chuyển 'Date' thành datetime, tạo Quarter, Month
     df_copy = df.copy()
-    if "Date" in df_copy.columns:
-        df_copy["Date"] = pd.to_datetime(df_copy["Date"])
-        df_copy["Quarter"] = df_copy["Date"].dt.quarter.astype('object')
-        df_copy["Month"] = df_copy["Date"].dt.month.astype('object')
+    if "DATE" in df_copy.columns:
+        df_copy["DATE"] = pd.to_datetime(df_copy["DATE"])
+        df_copy["QUARTER"] = df_copy["DATE"].dt.quarter.astype('object')
+        df_copy["MONTH"] = df_copy["DATE"].dt.month.astype('object')
 
     # Thêm các feature CTR, CPC, CPM
-    if "Clicks" in df_copy.columns and "Impressions" in df_copy.columns and "Acquisition_Cost" in df_copy.columns:
-        df_copy['CTR'] = round((df_copy['Clicks'] / df_copy['Impressions']) * 100, 2)
-        df_copy['CPC'] = round(df_copy['Acquisition_Cost'] / df_copy['Clicks'], 2)
-        df_copy['CPM'] = round((df_copy['Acquisition_Cost'] * 1000) / df_copy['Impressions'], 2)
+    if "CLICKS" in df_copy.columns and "IMPRESSIONS" in df_copy.columns and "ACQUISITION_COST" in df_copy.columns:
+        df_copy['CTR'] = round((df_copy['CLICKS'] / df_copy['IMPRESSIONS']) * 100, 2)
+        df_copy['CPC'] = round(df_copy['ACQUISITION_COST'] / df_copy['CLICKS'], 2)
+        df_copy['CPM'] = round((df_copy['ACQUISITION_COST'] * 1000) / df_copy['IMPRESSIONS'], 2)
 
     # Chuẩn bị X, y
     # Tuỳ theo cột ROI hay cột target thực tế trong dataset
@@ -98,16 +98,17 @@ def main():
     if "ROI" not in df_copy.columns:
         raise ValueError("Không tìm thấy cột 'ROI' trong DataFrame")
 
-    X = df_copy[['Target_Audience', 'Channel_Used', 'Acquisition_Cost', 'Location', 'Language',
-                 'Clicks', 'Impressions', 'Engagement_Score', 'CTR', 'CPC', 'CPM', 'Conversion_Rate',
-                 'Quarter', 'Month', 'Duration']]
+    X = df_copy[['TARGET_AUDIENCE', 'CHANNEL_USED', 'ACQUISITION_COST', 'LOCATION', 'LANGUAGE',
+             'CLICKS', 'IMPRESSIONS', 'ENGAGEMENT_SCORE', 'CTR', 'CPC',
+             'CPM', 'CONVERSION_RATE', 'QUARTER', 'MONTH', 'DURATION']]
+
 
     y = df_copy['ROI']
 
     # Tách feature phân loại & số
-    categorical_features = ['Target_Audience', 'Channel_Used', 'Location', 'Language', 'Quarter', 'Month']
-    numerical_features = ['Acquisition_Cost', 'Clicks', 'Impressions', 'Engagement_Score', 'CTR',
-                          'CPC', 'CPM', 'Conversion_Rate', 'Duration']
+    categorical_features = ['TARGET_AUDIENCE', 'CHANNEL_USED', 'LOCATION', 'LANGUAGE', 'QUARTER', 'MONTH']
+    numerical_features = ['ACQUISITION_COST', 'CLICKS', 'IMPRESSIONS', 'ENGAGEMENT_SCORE', 'CTR',
+                          'CPC', 'CPM', 'CONVERSION_RATE', 'DURATION']
 
     # Pipeline đơn giản RandomForestRegressor
     preprocessor = ColumnTransformer(

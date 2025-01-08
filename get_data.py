@@ -28,23 +28,23 @@ def get_data_from_snowflake(
     # Ví dụ query, thay đổi tùy vào bảng / cột thực tế
     query = """
     SELECT 
-        "Campaign_ID", 
-        "Company", 
-        "Campaign_type", 
-        "Target_audience", 
-        "Duration", 
-        "Channel_used", 
-        "Conversion_Rate", 
-        "Acquisition_Cost", 
-        "ROI", 
-        "Location", 
-        "Language", 
-        "Clicks", 
-        "Impressions", 
-        "Engagement_Score", 
-        "Customer_Segment", 
-        "Date"
-    FROM MARKETING_SPARK
+        CAMPAIGN_ID,
+        COMPANY,
+        CAMPAIGN_TYPE,
+        TARGET_AUDIENCE,
+        DURATION,
+        CHANNEL_USED,
+        CONVERSION_RATE,
+        ACQUISITION_COST,
+        ROI,
+        LOCATION,
+        LANGUAGE,
+        CLICKS,
+        IMPRESSIONS,
+        ENGAGEMENT_SCORE,
+        CUSTOMER_SEGMENT,
+        DATE
+    FROM CAMPAIGN_DATA_TEST
     """
 
     # Thực hiện truy vấn

@@ -1,5 +1,5 @@
 
-maplotlib
+matplotlib
 numpy
 pandas
 scikit-learn

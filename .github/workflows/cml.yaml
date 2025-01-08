@@ -33,4 +33,4 @@ jobs:
 
       - name: Report metrics with CML
         run: |
-          cml-send-comment metrics.json --md report.md --fail-on error
+          cml comment create report.md

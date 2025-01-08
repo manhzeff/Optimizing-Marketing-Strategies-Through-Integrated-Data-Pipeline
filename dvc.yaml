@@ -9,8 +9,11 @@ stages:
   train:
     cmd: python train.py
     deps:
+      - marketing_dataset.csv
       - train.py
-      - marketing_dataset.csv    # dữ liệu đầu vào để train
+      - requirements.txt
     outs:
-      - model.pkl               # nếu train.py xuất mô hình
-      - metrics.txt             # nếu train.py xuất file metrics
+      - model.pkl
+      - metrics.json
+      - report.md
+      - predictions.csv          # nếu train.py xuất file metrics

@@ -13,6 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Set up
+        uses: iterative/setup-tools@v1
+
       - name: Train model
         env:
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -34,10 +37,10 @@ jobs:
           # Đẩy kết quả (outputs) lên remote storage (nếu dùng DVC remote)
           dvc push
 
-          # Xuất báo cáo metrics
-          echo "## Training Metrics" > report.md
-          # Giả sử metrics.txt được sinh ra trong quá trình train
-          cat metrics.txt >> report.md
+      - name: Push DVC outputs
+        if: always()
+        run: dvc push
 
-          # Tạo comment lên Pull Request với CML
-          cml comment create report.md --pr
+      - name: Report metrics with CML
+        run: |
+          cml-send-comment metrics.json --md report.md --fail-on error

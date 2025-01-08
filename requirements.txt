@@ -6,3 +6,5 @@ scikit-learn
 seaborn
 xgboost
 regex
+joblib
+json

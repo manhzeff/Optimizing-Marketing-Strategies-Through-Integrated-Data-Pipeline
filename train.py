@@ -17,6 +17,9 @@ from sklearn.compose import ColumnTransformer
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from xgboost import XGBRegressor
 
+import joblib
+import json
+
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -55,12 +58,15 @@ def main():
     # Đọc file CSV (đã được lấy từ Snowflake)
     df = pd.read_csv("marketing_dataset.csv")
 
+    # In tên các cột để kiểm tra
+    print("Columns in DataFrame:", df.columns.tolist())
+
     # Thiết lập index (nếu cần)
-    # Tuỳ thuộc vào dữ liệu thực tế của bạn. Ở đây giả sử cột "Campaign_ID" tồn tại.
+    # Tuỳ thuộc vào dữ liệu thực tế của bạn. Ở đây giả sử cột "CAMPAIGN_ID" tồn tại.
     if "CAMPAIGN_ID" in df.columns:
         df = df.set_index("CAMPAIGN_ID")
 
-    # Kiểm tra cột Duration, chuyển sang số
+    # Kiểm tra cột DURATION, chuyển sang số
     if "DURATION" in df.columns:
         df['DURATION'] = df['DURATION'].str.extract(r'(\d+)', expand=False)
         df['DURATION'] = pd.to_numeric(df['DURATION'], errors='coerce')
@@ -71,15 +77,16 @@ def main():
     num_features = df.select_dtypes(include=np.number).columns.tolist()
     print(f"Numerical Features: {num_features}")
     cat_features = df.select_dtypes(exclude=np.number).columns.tolist()
-    # Nếu cột 'Date' tồn tại, remove nó khỏi cat_features
-    if "Date" in cat_features:
-        cat_features.remove("Date")
+    # Nếu cột 'DATE' tồn tại, remove nó khỏi cat_features
+    if "DATE" in cat_features:
+        cat_features.remove("DATE")
     print(f"Categorical Features: {cat_features}")
 
     # Kiểm tra outliers
-    print("Outliers:", count_outliers(df, num_features))
+    outliers = count_outliers(df, num_features)
+    print("Outliers:", outliers)
 
-    # Feature Engineering: chuyển 'Date' thành datetime, tạo Quarter, Month
+    # Feature Engineering: chuyển 'DATE' thành datetime, tạo Quarter, Month
     df_copy = df.copy()
     if "DATE" in df_copy.columns:
         df_copy["DATE"] = pd.to_datetime(df_copy["DATE"])
@@ -99,9 +106,8 @@ def main():
         raise ValueError("Không tìm thấy cột 'ROI' trong DataFrame")
 
     X = df_copy[['TARGET_AUDIENCE', 'CHANNEL_USED', 'ACQUISITION_COST', 'LOCATION', 'LANGUAGE',
-             'CLICKS', 'IMPRESSIONS', 'ENGAGEMENT_SCORE', 'CTR', 'CPC',
-             'CPM', 'CONVERSION_RATE', 'QUARTER', 'MONTH', 'DURATION']]
-
+                'CLICKS', 'IMPRESSIONS', 'ENGAGEMENT_SCORE', 'CTR', 'CPC',
+                'CPM', 'CONVERSION_RATE', 'QUARTER', 'MONTH', 'DURATION']]
 
     y = df_copy['ROI']
 
@@ -129,18 +135,35 @@ def main():
 
     # Đánh giá
     print("RandomForest Regressor Evaluation:")
-    print("  Mean Absolute Error (MAE):", mean_absolute_error(y_test, y_pred))
-    print("  Mean Squared Error (MSE):", mean_squared_error(y_test, y_pred))
-    print("  R-squared Score (R2):", r2_score(y_test, y_pred))
+    mae = mean_absolute_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+    print(f"  Mean Absolute Error (MAE): {mae}")
+    print(f"  Mean Squared Error (MSE): {mse}")
+    print(f"  R-squared Score (R2): {r2}")
 
-    result_df = pd.DataFrame({'Actual': y_test, 'Predicted': y_pred})
-    print("\nKết quả dự đoán (RandomForest):")
-    print(result_df.head())
+    # Lưu metrics vào JSON
+    metrics = {
+        "RandomForest Regressor Evaluation": {
+            "Mean Absolute Error (MAE)": mae,
+            "Mean Squared Error (MSE)": mse,
+            "R-squared Score (R2)": r2
+        }
+    }
+
+    # Lưu kết quả dự đoán
+    predictions = pd.DataFrame({'Actual': y_test, 'Predicted': y_pred})
+    predictions.to_csv('predictions.csv')
+    metrics["RandomForest Predictions"] = predictions.head().to_dict(orient='records')
 
     # Feature Importance
     importances = model.named_steps['regressor'].feature_importances_
-    for feature, importance in zip(X.columns, importances):
-        print(f"{feature}: {importance:.4f}")
+    # Lấy tên các feature sau OneHotEncoding
+    ohe = model.named_steps['preprocessor'].named_transformers_['cat']
+    ohe_features = ohe.get_feature_names_out(categorical_features)
+    all_features = list(ohe_features) + numerical_features
+    feature_importances = {feature: round(importance, 4) for feature, importance in zip(all_features, importances)}
+    metrics["Feature Importances"] = feature_importances
 
     # So sánh với một số model khác (baseline)
     regression_models = [
@@ -169,6 +192,10 @@ def main():
     print("\nBaseline Model Comparison (MSE):")
     print(baseline_results)
 
+    # Lưu baseline results
+    baseline_dict = baseline_results.to_dict(orient='index')
+    metrics["Baseline Model Comparison (MSE)"] = baseline_dict
+
     # Main model: Lasso + GridSearch
     final_preprocessor = ColumnTransformer(
         transformers=[
@@ -196,15 +223,73 @@ def main():
     best_lasso = grid_search.best_estimator_
     y_pred2 = best_lasso.predict(X_test2)
 
-    mae = mean_absolute_error(y_test2, y_pred2)
-    mse = mean_squared_error(y_test2, y_pred2)
-    r2 = r2_score(y_test2, y_pred2)
+    mae2 = mean_absolute_error(y_test2, y_pred2)
+    mse2 = mean_squared_error(y_test2, y_pred2)
+    r2_2 = r2_score(y_test2, y_pred2)
 
     print("\n=== Final Lasso Model with GridSearch ===")
     print("Best Params:", grid_search.best_params_)
-    print("Mean Absolute Error (MAE):", mae)
-    print("Mean Squared Error (MSE):", mse)
-    print("R-squared Score (R2):", r2)
+    print(f"Mean Absolute Error (MAE): {mae2}")
+    print(f"Mean Squared Error (MSE): {mse2}")
+    print(f"R-squared Score (R2): {r2_2}")
+
+    # Lưu kết quả final model vào metrics
+    metrics["Final Lasso Model with GridSearch"] = {
+        "Best Params": grid_search.best_params_,
+        "Mean Absolute Error (MAE)": mae2,
+        "Mean Squared Error (MSE)": mse2,
+        "R-squared Score (R2)": r2_2
+    }
+
+    # Lưu metrics vào file JSON
+    with open('metrics.json', 'w') as f:
+        json.dump(metrics, f, indent=4)
+
+    # Lưu metrics vào Markdown cho báo cáo chi tiết
+    with open('report.md', 'w') as f:
+        f.write("# Training Metrics\n\n")
+        
+        # RandomForest Evaluation
+        f.write("## RandomForest Regressor Evaluation\n")
+        f.write(f"- **Mean Absolute Error (MAE)**: {mae}\n")
+        f.write(f"- **Mean Squared Error (MSE)**: {mse}\n")
+        f.write(f"- **R-squared Score (R2)**: {r2}\n\n")
+        
+        # Predictions
+        f.write("## Kết quả dự đoán (RandomForest)\n")
+        f.write(predictions.head().to_markdown())
+        f.write("\n\n")
+        
+        # Feature Importances
+        f.write("## Feature Importances\n")
+        for feature, importance in feature_importances.items():
+            f.write(f"- **{feature}**: {importance}\n")
+        f.write("\n")
+        
+        # Baseline Comparison
+        f.write("## Baseline Model Comparison (MSE)\n")
+        f.write(baseline_results.to_markdown())
+        f.write("\n\n")
+        
+        # Final Lasso Model
+        f.write("## Final Lasso Model with GridSearch\n")
+        f.write(f"- **Best Params**: {grid_search.best_params_}\n")
+        f.write(f"- **Mean Absolute Error (MAE)**: {mae2}\n")
+        f.write(f"- **Mean Squared Error (MSE)**: {mse2}\n")
+        f.write(f"- **R-squared Score (R2)**: {r2_2}\n")
+
+    # Lưu mô hình
+    joblib.dump(best_lasso, 'model.pkl')
+    print("Model saved to model.pkl")
+
+    # Lưu các file vào DVC
+    # (Nếu bạn muốn tự động hóa việc này, bạn có thể thêm các lệnh DVC ở đây hoặc thực hiện thủ công sau khi chạy script)
+    # Ví dụ:
+    # !dvc add model.pkl metrics.json report.md predictions.csv
+    # !git add model.pkl.dvc metrics.json.dvc report.md.dvc predictions.csv.dvc
+    # !git commit -m "Add model and metrics"
+    # !git push
+    # !dvc push
 
 if __name__ == "__main__":
     main()

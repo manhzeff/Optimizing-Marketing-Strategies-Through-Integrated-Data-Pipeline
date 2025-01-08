@@ -31,11 +31,6 @@ jobs:
           # Thực thi pipeline
           dvc repro
 
-          # Đẩy kết quả (outputs) lên remote storage (nếu dùng DVC remote)
-          dvc push
-
-
-
       - name: Report metrics with CML
         run: |
           cml-send-comment metrics.json --md report.md --fail-on errorr

@@ -34,3 +34,5 @@ jobs:
       - name: Report metrics with CML
         run: |
           cml comment create report.md
+        env:
+          REPO_TOKEN: ${{ secrets.TOKEN_GITHUB }}

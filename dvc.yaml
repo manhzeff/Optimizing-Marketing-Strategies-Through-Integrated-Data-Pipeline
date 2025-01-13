@@ -1,0 +1,19 @@
+stages:
+  get_data:
+    cmd: python get_data.py
+    deps:
+      - get_data.py
+    outs:
+      - marketing_dataset.csv    # file CSV sẽ được tạo từ get_data.py
+
+  train:
+    cmd: python train.py
+    deps:
+      - marketing_dataset.csv
+      - train.py
+      - requirements.txt
+    outs:
+      - model.pkl
+      - metrics.json
+      - report.md
+      - predictions.csv          # nếu train.py xuất file metrics

@@ -1,0 +1,38 @@
+name: model-training
+
+on:
+  push:
+    branches: ["dev-manh"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    container: ghcr.io/iterative/cml:0-dvc2-base1
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Train model
+        env:
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_TABLE: ${{ secrets.SNOWFLAKE_TABLE }}
+
+        run: |
+          # Cài đặt các thư viện cần thiết
+          pip install -r requirements.txt
+          pip install snowflake-connector-python
+          
+          # Thực thi pipeline
+          dvc repro
+
+      - name: Report metrics with CML
+        run: |
+          cml comment create report.md
+        env:
+          REPO_TOKEN: ${{ secrets.TOKEN_GITHUB }}

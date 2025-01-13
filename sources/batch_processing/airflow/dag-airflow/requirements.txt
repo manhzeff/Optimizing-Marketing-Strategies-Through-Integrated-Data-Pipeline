@@ -1,4 +1,5 @@
 apache-airflow-providers-amazon 
 pyarrow
 apache-airflow-providers-snowflake
-
+apache-airflow-providers-apache-spark
+python-dotenv

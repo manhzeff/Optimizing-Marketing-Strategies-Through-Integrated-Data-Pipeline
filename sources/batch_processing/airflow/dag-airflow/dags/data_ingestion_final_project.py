@@ -27,7 +27,7 @@ AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.environ.get("AWS_REGION") or "ap-southeast-2"  # Hoặc region khác
 
 S3_BUCKET = os.environ.get("AWS_S3_BUCKET")
-EMR_SERVERLESS_APP_ID = os.environ.get("EMR_SERVERLESS_APP_ID")  
+ 
 
 dataset_file = "marketing_campaign_dataset.csv"
 dataset_url = "https://drive.google.com/uc?export=download&id=1osgD5kTc7p6wNbe9yL0biuYT9KUqQxJ3"
@@ -38,29 +38,25 @@ parquet_file = dataset_file.replace('.csv', '.parquet')
 PYSPARK_S3_PATH = f"s3://zeffmarketingbucket/jobs/pyspark_clean.py"
 
 # Cluster ID đã tồn tại
-EXISTING_CLUSTER_ID = "j-ZEDLYQKDL6FA"
+EXISTING_CLUSTER_ID = "j-3L9HEZV9ZESEU"
 
 # ------------------------------------------------
 # 2. Định nghĩa các hàm xử lý CSV -> Parquet -> S3
 # ------------------------------------------------
 def format_to_parquet(src_file):
-    """Chuyển đổi CSV sang Parquet."""
     if not src_file.endswith('.csv'):
-        raise ValueError("Chỉ chấp nhận file CSV!")
+        logging.error("Can only accept source files in CSV format, for the moment")
+        return
     table = pv.read_csv(src_file)
-    pq.write_table(table, src_file.replace('.csv', '.parquet'))
-    logging.info(f"Chuyển đổi {src_file} sang định dạng Parquet.")
+    return pq.write_table(table, src_file.replace('.csv', '.parquet'))
 
 def upload_to_s3(bucket, key, local_file):
-    """Upload file lên S3."""
     s3_client = boto3.client(
         's3',
         aws_access_key_id=AWS_ACCESS_KEY_ID,
         aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        region_name=AWS_REGION
     )
     s3_client.upload_file(local_file, bucket, key)
-    logging.info(f"Tải file {local_file} lên S3 bucket {bucket} với key {key}.")
 
 # ------------------------------------------------
 # 3. Hàm gọi EMR Serverless (thay thế EmrAddStepsOperator)
@@ -106,37 +102,41 @@ with DAG(
     tags=['marketing-campaign'],
 ) as dag:
 
-    # # Task 1: Tải file CSV từ Google Drive
-    # download_dataset_task = BashOperator(
-    #     task_id="download_dataset_task",
-    #     bash_command=f"curl -L -o {path_to_local_home}/{dataset_file} '{dataset_url}'"
-    # )
+    # Task 1: Tải file CSV từ Google Drive
+    download_dataset_task = BashOperator(
+        task_id="download_dataset_task",
+        bash_command="gdrive_connect.sh"
+    )
 
-    # # Task 2: Chuyển CSV -> Parquet
-    # format_to_parquet_task = PythonOperator(
-    #     task_id="format_to_parquet_task",
-    #     python_callable=format_to_parquet,
-    #     op_kwargs={"src_file": f"{path_to_local_home}/{dataset_file}"},
-    # )
+    # Task 2: Chuyển CSV -> Parquet
+    format_to_parquet_task = PythonOperator(
+        task_id="format_to_parquet_task",
+        python_callable=format_to_parquet,
+        op_kwargs={
+            "src_file": f"{path_to_local_home}/{dataset_file}",
+        },
+    )
 
-    # # Task 3: Upload Parquet lên S3
-    # local_to_s3_task = PythonOperator(
-    #     task_id="local_to_s3_task",
-    #     python_callable=upload_to_s3,
-    #     op_kwargs={
-    #         "bucket": S3_BUCKET,
-    #         "key": f"raw/{parquet_file}",
-    #         "local_file": f"{path_to_local_home}/{parquet_file}",
-    #     },
-    # )
+    # Task 3: Upload Parquet lên S3
+    local_to_s3_task = PythonOperator(
+        task_id="local_to_s3_task",
+        python_callable=upload_to_s3,
+        op_kwargs={
+            "bucket": S3_BUCKET,
+            "key": f"raw/{parquet_file}",
+            "local_file": f"{path_to_local_home}/{parquet_file}",
+        },
+    )
 
-    # # Task 4: Làm mới bảng dữ liệu Snowflake
-    # load_data_to_snowflake = SnowflakeOperator(
-    #     task_id="load_data_to_snowflake",
-    #     snowflake_conn_id="snowflake_connection",
-    #     sql="ALTER EXTERNAL TABLE EXTERNAL_CAMPAIGN_DATA REFRESH",
-    #     trigger_rule=TriggerRule.NONE_FAILED
-    # )
+    # Task 4: Làm mới bảng dữ liệu Snowflake
+    load_data_to_snowflake = SnowflakeOperator(
+        snowflake_conn_id = 'snowflake_connection',
+        sql = """
+            ALTER EXTERNAL TABLE EXTERNAL_CAMPAIGN_DATA REFRESH
+        """,
+        task_id = 'SnowFlake_Refresh',
+        trigger_rule = TriggerRule.NONE_FAILED
+    )
 
 
 
@@ -171,5 +171,4 @@ with DAG(
     # ------------------------------------------------
     # 5. Luồng DAG
     # ------------------------------------------------
-    # download_dataset_task >> format_to_parquet_task >> local_to_s3_task >> load_data_to_snowflake >> 
-    add_emr_steps >> step_checker >> terminate_emr_cluster
+    download_dataset_task >> format_to_parquet_task >> local_to_s3_task >> load_data_to_snowflake >> add_emr_steps >> step_checker >> terminate_emr_cluster
